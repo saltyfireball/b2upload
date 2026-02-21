@@ -269,7 +269,6 @@ Pre-built binaries are available from the [Releases](../../releases) page for al
 | -------- | ---------------------- |
 | macOS    | `.dmg`                 |
 | Windows  | `.msi`, `.exe` (NSIS)  |
-| Linux    | `.deb`, `.AppImage` S) |
 | Linux    | `.deb`, `.AppImage`    |
 
 ### macOS Gatekeeper

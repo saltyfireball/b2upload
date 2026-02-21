@@ -88,6 +88,8 @@ jobs:
 
       - name: Cleanup target directory
         if: always()
+        # Forcing bash makes 'rm -rf' work on Windows, macOS, and Linux
+        shell: bash
         run: |
           echo "[INFO] Cleaning up build artifacts to save storage..."
           rm -rf src-tauri/target
