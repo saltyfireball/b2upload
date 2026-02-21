@@ -1,0 +1,32 @@
+
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1287.2"
+     height="327.2"
+     viewBox="0 0 1287.2 327.2">
+  
+<defs>
+  <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#FF6188" />
+<stop offset="16.666666666666664%" stop-color="#FC9867" />
+<stop offset="33.33333333333333%" stop-color="#FFD866" />
+<stop offset="50%" stop-color="#A9DC76" />
+<stop offset="66.66666666666666%" stop-color="#78DCE8" />
+<stop offset="83.33333333333334%" stop-color="#5C7CFA" />
+<stop offset="100%" stop-color="#AB9DF2" />
+  </linearGradient>
+</defs>
+
+  <g fill="url(#grad)"
+     font-family="Courier New"
+     font-size="32"
+     dominant-baseline="hanging">
+    <text x="10" y="38.4" xml:space="preserve">██████╗ ██████╗ ██╗   ██╗██████╗ ██╗      ██████╗  █████╗ ██████╗ </text>
+<text x="10" y="76.8" xml:space="preserve">██╔══██╗╚════██╗██║   ██║██╔══██╗██║     ██╔═══██╗██╔══██╗██╔══██╗</text>
+<text x="10" y="115.19999999999999" xml:space="preserve">██████╔╝ █████╔╝██║   ██║██████╔╝██║     ██║   ██║███████║██║  ██║</text>
+<text x="10" y="153.6" xml:space="preserve">██╔══██╗██╔═══╝ ██║   ██║██╔═══╝ ██║     ██║   ██║██╔══██║██║  ██║</text>
+<text x="10" y="192" xml:space="preserve">██████╔╝███████╗╚██████╔╝██║     ███████╗╚██████╔╝██║  ██║██████╔╝</text>
+<text x="10" y="230.39999999999998" xml:space="preserve">╚═════╝ ╚══════╝ ╚═════╝ ╚═╝     ╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚═════╝ </text>
+<text x="10" y="268.8" xml:space="preserve">                                                                  </text>
+<text x="10" y="307.2" xml:space="preserve"></text>
+  </g>
+</svg>
