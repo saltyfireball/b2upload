@@ -55,8 +55,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libdbus-1-dev libsecret-1-dev
 
+      - name: Install cargo-binstall
+        run: curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+
       - name: Install Tauri CLI
-        run: cargo install tauri-cli
+        run: cargo binstall tauri-cli --force -y
 
       - name: Build
         run: cargo tauri build ${{ matrix.args }}
@@ -65,7 +68,6 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           mkdir -p artifacts
-          # Simplified find: look for the extensions anywhere in the bundle folder
           find src-tauri/target -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" \) | grep "bundle" | xargs -I {} cp {} artifacts/
           ls -la artifacts/
 
@@ -74,7 +76,6 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifacts
-          # Look for msi/exe specifically in the release/bundle path
           Get-ChildItem -Path src-tauri/target -Recurse -Include *.msi,*.exe | Where-Object { $_.FullName -match "bundle" } | Copy-Item -Destination artifacts/
           Get-ChildItem artifacts/
 
@@ -83,6 +84,13 @@ jobs:
         with:
           name: build-${{ matrix.target }}
           path: artifacts/
+          if-no-files-found: error
+
+      - name: Cleanup target directory
+        if: always()
+        run: |
+          echo "[INFO] Cleaning up build artifacts to save storage..."
+          rm -rf src-tauri/target
 
   release:
     needs: build
