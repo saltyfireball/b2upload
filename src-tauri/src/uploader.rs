@@ -3,9 +3,24 @@ use aws_credential_types::Credentials;
 use aws_sdk_s3::config::Builder as S3ConfigBuilder;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::Client as S3Client;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
 use std::collections::HashMap;
 use std::path::Path;
 use uuid::Uuid;
+
+type HmacSha256 = Hmac<Sha256>;
+
+fn generate_hmac_token(path: &str, expires: u64, secret: &str) -> String {
+    let message = format!("{}:{}", path, expires);
+    let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
+        .expect("HMAC can take key of any size");
+    mac.update(message.as_bytes());
+    let result = mac.finalize();
+    URL_SAFE_NO_PAD.encode(result.into_bytes())
+}
 
 fn parse_region(endpoint: &str) -> String {
     // e.g. s3.us-east-005.backblazeb2.com → us-east-005
@@ -27,6 +42,7 @@ pub async fn upload_file(
     file_path: &str,
     mode: &str,
     settings: &HashMap<String, String>,
+    ttl: Option<u64>,
 ) -> Result<String, String> {
     let endpoint = settings.get("S3_ENDPOINT").ok_or("Missing S3_ENDPOINT")?;
     let key_id = settings
@@ -120,7 +136,26 @@ pub async fn upload_file(
         .map_err(|e| format!("Upload failed: {}", e))?;
 
     // Build URL with optional token
-    let url = if token.is_empty() {
+    let token_mode = settings.get("TOKEN_MODE").map(|s| s.as_str()).unwrap_or("static");
+
+    let url = if token_mode == "dynamic" {
+        if let Some(ttl_secs) = ttl {
+            let secret = settings.get("TOKEN_SECRET").map(|s| s.as_str()).unwrap_or("");
+            if secret.is_empty() {
+                return Err("TOKEN_SECRET is required for dynamic token mode".to_string());
+            }
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(|e| e.to_string())?
+                .as_secs();
+            let expires = now + ttl_secs;
+            let path = format!("/{}", object_key);
+            let sig = generate_hmac_token(&path, expires, secret);
+            format!("https://{}/{}?token={}&expires={}", domain, object_key, sig, expires)
+        } else {
+            format!("https://{}/{}", domain, object_key)
+        }
+    } else if token.is_empty() {
         format!("https://{}/{}", domain, object_key)
     } else {
         format!("https://{}/{}?token={}", domain, object_key, token)

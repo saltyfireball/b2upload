@@ -24,6 +24,16 @@ const clipToggle = document.getElementById("clip-toggle");
 let mode = "folder2";
 let autoClip = true;
 let lastResults = []; // [{file, url}]
+let tokenMode = "static";
+
+// TTL elements
+const ttlBar = document.getElementById("ttl-bar");
+const ttlSelect = document.getElementById("ttl-select");
+const ttlCustom = document.getElementById("ttl-custom");
+const toggleTokenMode = document.getElementById("toggle-token-mode");
+const dynamicTokenSettings = document.getElementById("dynamic-token-settings");
+const defaultTtlSelect = document.getElementById("default-ttl-select");
+const defaultTtlCustom = document.getElementById("default-ttl-custom");
 
 const modeLeftLabel = document.querySelector(".toggle-group .toggle-label:first-child");
 const modeRightLabel = document.querySelector(".toggle-group .toggle-label:last-child");
@@ -39,6 +49,34 @@ modeToggle.addEventListener("click", () => {
 clipToggle.addEventListener("click", () => {
     autoClip = clipToggle.classList.toggle("on");
 });
+
+// TTL select: show custom input when "Custom" selected
+ttlSelect.addEventListener("change", () => {
+    ttlCustom.classList.toggle("hidden", ttlSelect.value !== "custom");
+});
+
+defaultTtlSelect.addEventListener("change", () => {
+    defaultTtlCustom.classList.toggle("hidden", defaultTtlSelect.value !== "custom");
+});
+
+function getCurrentTtl() {
+    if (tokenMode !== "dynamic") return null;
+    if (ttlSelect.value === "custom") {
+        const v = parseInt(ttlCustom.value, 10);
+        return v > 0 ? v : null;
+    }
+    return parseInt(ttlSelect.value, 10);
+}
+
+function applyTokenMode(mode) {
+    tokenMode = mode;
+    // Main view: show/hide TTL bar
+    ttlBar.classList.toggle("hidden", mode !== "dynamic");
+    // Settings view: show/hide static token fields and dynamic settings
+    document.querySelectorAll(".static-token-field").forEach(el => {
+        el.classList.toggle("hidden", mode === "dynamic");
+    });
+}
 
 function showView(view) {
     mainView.classList.add("hidden");
@@ -183,6 +221,15 @@ toggleOverwriteUploads.addEventListener("click", () => {
     setSettingsToggle(toggleOverwriteUploads, !toggleOverwriteUploads.classList.contains("on"));
 });
 
+toggleTokenMode.addEventListener("click", () => {
+    const on = !toggleTokenMode.classList.contains("on");
+    setSettingsToggle(toggleTokenMode, on);
+    dynamicTokenSettings.classList.toggle("hidden", !on);
+    document.querySelectorAll(".static-token-field").forEach(el => {
+        el.classList.toggle("hidden", on);
+    });
+});
+
 function capitalize(str) {
     if (!str) return "";
     return str.charAt(0).toUpperCase() + str.slice(1);
@@ -207,6 +254,24 @@ settingsBtn.addEventListener("click", async () => {
     setSettingsToggle(toggleDateFolders, (settings.DATE_FOLDERS || "on") !== "off");
     setSettingsToggle(toggleUuidFilenames, (settings.UUID_FILENAMES || "on") !== "off");
     setSettingsToggle(toggleOverwriteUploads, (settings.OVERWRITE_UPLOADS || "no") === "yes");
+    // Token mode
+    const isDynamic = (settings.TOKEN_MODE || "static") === "dynamic";
+    setSettingsToggle(toggleTokenMode, isDynamic);
+    dynamicTokenSettings.classList.toggle("hidden", !isDynamic);
+    document.querySelectorAll(".static-token-field").forEach(el => {
+        el.classList.toggle("hidden", isDynamic);
+    });
+    if (settings.DEFAULT_TTL) {
+        const presetValues = [...defaultTtlSelect.options].map(o => o.value).filter(v => v !== "custom");
+        if (presetValues.includes(settings.DEFAULT_TTL)) {
+            defaultTtlSelect.value = settings.DEFAULT_TTL;
+            defaultTtlCustom.classList.add("hidden");
+        } else {
+            defaultTtlSelect.value = "custom";
+            defaultTtlCustom.value = settings.DEFAULT_TTL;
+            defaultTtlCustom.classList.remove("hidden");
+        }
+    }
     showView(settingsView);
 });
 
@@ -215,15 +280,37 @@ backBtn.addEventListener("click", () => showView(mainView));
 settingsForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const values = {};
-    for (const input of settingsForm.querySelectorAll("input")) {
-        values[input.name] = input.value;
+    for (const input of settingsForm.querySelectorAll("input, select")) {
+        if (input.name) values[input.name] = input.value;
     }
     // Add toggle values
     values.DATE_FOLDERS = toggleDateFolders.classList.contains("on") ? "on" : "off";
     values.UUID_FILENAMES = toggleUuidFilenames.classList.contains("on") ? "on" : "off";
     values.OVERWRITE_UPLOADS = toggleOverwriteUploads.classList.contains("on") ? "yes" : "no";
+    values.TOKEN_MODE = toggleTokenMode.classList.contains("on") ? "dynamic" : "static";
+    // If default TTL is "custom", use the custom input value
+    if (defaultTtlSelect.value === "custom") {
+        const customVal = defaultTtlCustom.value;
+        if (customVal && parseInt(customVal, 10) > 0) {
+            values.DEFAULT_TTL = customVal;
+        }
+    }
     await invoke("save_settings", { values });
     updateModeLabels(values.FOLDER_1, values.FOLDER_2);
+    // Apply token mode to main view
+    applyTokenMode(values.TOKEN_MODE);
+    if (values.TOKEN_MODE === "dynamic" && values.DEFAULT_TTL) {
+        // Sync main TTL select: use preset if it matches, otherwise set custom
+        const presetValues = [...ttlSelect.options].map(o => o.value).filter(v => v !== "custom");
+        if (presetValues.includes(values.DEFAULT_TTL)) {
+            ttlSelect.value = values.DEFAULT_TTL;
+            ttlCustom.classList.add("hidden");
+        } else {
+            ttlSelect.value = "custom";
+            ttlCustom.value = values.DEFAULT_TTL;
+            ttlCustom.classList.remove("hidden");
+        }
+    }
     showView(mainView);
     showStatus("Settings saved", "success");
 });
@@ -272,6 +359,7 @@ async function handleFilePaths(paths) {
                             filePath: row.path,
                             mode,
                             autoClip: false,
+                            ttl: getCurrentTtl(),
                         });
                         setRowSuccess(row.tr, url);
                         lastResults.push({ file: row.name, url });
@@ -628,9 +716,20 @@ async function runTerminal() {
     if (!has) {
         showStatus("Open settings to configure", "");
     }
-    // Load folder names to update toggle labels
+    // Load folder names and token mode to update UI
     try {
         const settings = await invoke("get_settings");
         updateModeLabels(settings.FOLDER_1, settings.FOLDER_2);
+        applyTokenMode(settings.TOKEN_MODE || "static");
+        if (settings.DEFAULT_TTL) {
+            const presetValues = [...ttlSelect.options].map(o => o.value).filter(v => v !== "custom");
+            if (presetValues.includes(settings.DEFAULT_TTL)) {
+                ttlSelect.value = settings.DEFAULT_TTL;
+            } else {
+                ttlSelect.value = "custom";
+                ttlCustom.value = settings.DEFAULT_TTL;
+                ttlCustom.classList.remove("hidden");
+            }
+        }
     } catch (_) {}
 })();

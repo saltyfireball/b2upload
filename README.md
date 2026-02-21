@@ -43,6 +43,16 @@ Two folders can be configured. Each has a name and an optional URL token.
 
 The toggle on the main screen switches between Folder 1 and Folder 2. The toggle labels update to match whatever names you've configured (capitalized).
 
+### Token Mode
+
+| Setting            | Default   | Description                                                                                                        |
+| ------------------ | --------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Dynamic tokens** | Off       | When on, generates HMAC-SHA256 signed URLs with expiration instead of static per-folder tokens                     |
+| **Token Secret**   | _(empty)_ | Shared HMAC-SHA256 secret (must match the secret configured in your Cloudflare Worker)                             |
+| **Default TTL**    | 1 hour    | Default time-to-live for signed URLs. A TTL dropdown also appears on the main screen when dynamic mode is enabled. |
+
+When dynamic mode is enabled, static token fields are hidden (values are preserved). The generated URL format is `https://domain/key?token=SIGNATURE&expires=TIMESTAMP` where the signature is HMAC-SHA256 over `/{object_key}:{expires}`, base64url-encoded without padding.
+
 ### Upload Options
 
 | Option                | Default | Description                                                                                                                                                                                                       |
@@ -99,6 +109,8 @@ The folder tokens are designed for use with a proxy that sits between your users
 
 ### Example Worker
 
+#### Simple 1 token per folder
+
 ```js
 export default {
     async fetch(request, env) {
@@ -138,7 +150,102 @@ export default {
 };
 ```
 
+#### Dynamic token + expiry example [cloudflare_worker.js](src/cloudflare_worker.js)
+
+```js
+const VERSION = "1.1.2";
+
+export default {
+    async fetch(request, env) {
+        const url = new URL(request.url);
+        const path = url.pathname;
+
+        if (path === "/version") {
+            return new Response(VERSION);
+        }
+
+        const token = url.searchParams.get("token");
+        const expires = url.searchParams.get("expires");
+
+        if (!token || !expires) {
+            return new Response("Unauthorized", { status: 401 });
+        }
+
+        // Check expiry first (expires is a Unix timestamp in seconds)
+        const now = Math.floor(Date.now() / 1000);
+        if (now > parseInt(expires, 10)) {
+            return new Response("Link expired", { status: 403 });
+        }
+
+        // Validate token — signed over path + expires together
+        const expectedToken = await generateToken(
+            path,
+            expires,
+            env.TOKEN_SECRET,
+        );
+
+        if (token !== expectedToken) {
+            return new Response("Unauthorized", { status: 401 });
+        }
+
+        // Strip params before proxying to B2
+        url.searchParams.delete("token");
+        url.searchParams.delete("expires");
+
+        const b2Url = `${env.B2_ORIGIN_URL}${path}`;
+        const response = await fetch(b2Url);
+
+        const headers = new Headers(response.headers);
+        headers.set("Access-Control-Allow-Origin", "*");
+
+        return new Response(response.body, {
+            status: response.status,
+            headers,
+        });
+    },
+};
+
+async function generateToken(path, expires, secret) {
+    const message = `${path}:${expires}`;
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+        "raw",
+        encoder.encode(secret),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"],
+    );
+    const signature = await crypto.subtle.sign(
+        "HMAC",
+        key,
+        encoder.encode(message),
+    );
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(signature)));
+    return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+```
+
+Set the secret in Cloudflare as an environment variable called `TOKEN_SECRET`.
+
 You can extend this to support a master token that works across all paths, multiple tokens per folder, or any other access pattern you need.
+
+### wrangler
+
+You can setup the variables and deploy with wrangler
+
+```bash
+# set secret(s), this will prompt you for the secret
+wrangler secret put TOKEN_SECRET --name <worker-name>
+
+# generate secret (make sure to save this somewhere lol)
+SECRET=$(openssl rand -base64 32)
+
+# set secret(s)
+echo "$SECRET" | wrangler secret put TOKEN_SECRET --name media-auth
+
+# deploy workers from wrangler.toml
+wrangler deploy
+```
 
 ## Tech Stack
 

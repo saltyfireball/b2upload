@@ -31,9 +31,10 @@ async fn upload_file(
     file_path: String,
     mode: String,
     auto_clip: bool,
+    ttl: Option<u64>,
 ) -> Result<String, String> {
     let settings = storage::get_settings(&app)?;
-    let url = uploader::upload_file(&file_path, &mode, &settings).await?;
+    let url = uploader::upload_file(&file_path, &mode, &settings, ttl).await?;
 
     if auto_clip {
         app.clipboard()

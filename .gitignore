@@ -8,3 +8,9 @@ src-tauri/target/
 # OS
 .DS_Store
 Thumbs.db
+
+node_modules/
+
+# cloudflare / wrangler
+.dev.vars
+.wrangler/

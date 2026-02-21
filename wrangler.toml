@@ -1,0 +1,4 @@
+name = "media-auth"
+main = "src/cloudflare_worker.js"
+compatibility_date = "2024-01-01"
+preview_urls = false

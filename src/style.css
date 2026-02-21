@@ -108,6 +108,61 @@ body {
     background: #a9dc76;
 }
 
+/* TTL Bar */
+#ttl-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 4px 16px 8px;
+}
+
+.ttl-label {
+    font-size: 13px;
+    color: #939293;
+    font-weight: 600;
+}
+
+#ttl-select,
+#default-ttl-select {
+    background: #221f22;
+    border: 1px solid #403e41;
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: #fcfcfa;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+}
+
+#ttl-select:focus,
+#default-ttl-select:focus {
+    border-color: #78dce8;
+}
+
+#ttl-custom,
+#default-ttl-custom {
+    background: #221f22;
+    border: 1px solid #403e41;
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: #fcfcfa;
+    font-size: 13px;
+    outline: none;
+    width: 100px;
+}
+
+#ttl-custom:focus,
+#default-ttl-custom:focus {
+    border-color: #78dce8;
+}
+
+#dynamic-token-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
 #drop-zone {
     margin: 12px 16px;
     min-height: 60px;
@@ -432,7 +487,9 @@ body {
 .about-version {
     font-size: 12px;
     color: #727072;
-    font-family: "SF Mono", "Fira Code", "Cascadia Code", "JetBrains Mono", "Consolas", monospace;
+    font-family:
+        "SF Mono", "Fira Code", "Cascadia Code", "JetBrains Mono", "Consolas",
+        monospace;
     padding-top: 12px;
 }
 
@@ -441,10 +498,18 @@ body {
     text-align: center;
     color: #fcfcfa;
     font-size: 14px;
-    font-family: "SF Mono", "Fira Code", "Cascadia Code", "JetBrains Mono", "Consolas", monospace;
+    font-family:
+        "SF Mono", "Fira Code", "Cascadia Code", "JetBrains Mono", "Consolas",
+        monospace;
 }
-.about-author-name { color: #a9dc76; font-weight: 600; }
-.about-author-link { color: #ab9df2; text-decoration: none; }
+.about-author-name {
+    color: #a9dc76;
+    font-weight: 600;
+}
+.about-author-link {
+    color: #ab9df2;
+    text-decoration: none;
+}
 
 .about-close {
     margin-top: 12px;
@@ -458,7 +523,9 @@ body {
     cursor: pointer;
     transition: background 0.15s;
 }
-.about-close:hover { background: #5b595c; }
+.about-close:hover {
+    background: #5b595c;
+}
 
 /* ── Terminal Widget ── */
 .terminal {
@@ -466,9 +533,9 @@ body {
     background: #19181a;
     border-radius: 10px;
     box-shadow:
-        0 0 0 1px rgba(114,112,114,0.2),
-        0 25px 70px rgba(0,0,0,0.6),
-        0 0 50px rgba(171,157,242,0.05);
+        0 0 0 1px rgba(114, 112, 114, 0.2),
+        0 25px 70px rgba(0, 0, 0, 0.6),
+        0 0 50px rgba(171, 157, 242, 0.05);
     overflow: hidden;
     position: relative;
     animation: terminal-boot 0.6s ease-out;
@@ -479,32 +546,59 @@ body {
     inset: -1px;
     border-radius: 11px;
     padding: 1px;
-    background: linear-gradient(135deg, rgba(171,157,242,0.15), transparent 40%, transparent 60%, rgba(120,220,232,0.15));
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    background: linear-gradient(
+        135deg,
+        rgba(171, 157, 242, 0.15),
+        transparent 40%,
+        transparent 60%,
+        rgba(120, 220, 232, 0.15)
+    );
+    -webkit-mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
     pointer-events: none;
 }
 @keyframes terminal-boot {
-    0% { opacity: 0; transform: scale(0.95) translateY(10px); }
-    100% { opacity: 1; transform: scale(1) translateY(0); }
+    0% {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
 }
 
 .term-title-bar {
     height: 38px;
     background: #19181a;
-    border-bottom: 1px solid rgba(114,112,114,0.15);
+    border-bottom: 1px solid rgba(114, 112, 114, 0.15);
     display: flex;
     align-items: center;
     padding: 0 14px;
     position: relative;
     z-index: 5;
 }
-.term-dots { display: flex; gap: 7px; }
-.term-dot { width: 12px; height: 12px; border-radius: 50%; }
-.dot-red { background: #ff6188; }
-.dot-yellow { background: #ffd866; }
-.dot-green { background: #a9dc76; }
+.term-dots {
+    display: flex;
+    gap: 7px;
+}
+.term-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+.dot-red {
+    background: #ff6188;
+}
+.dot-yellow {
+    background: #ffd866;
+}
+.dot-green {
+    background: #a9dc76;
+}
 .term-title-text {
     position: absolute;
     left: 50%;
@@ -512,7 +606,9 @@ body {
     color: #727072;
     font-size: 12px;
     letter-spacing: 0.5px;
-    font-family: "SF Mono", "Fira Code", "Cascadia Code", "JetBrains Mono", "Consolas", monospace;
+    font-family:
+        "SF Mono", "Fira Code", "Cascadia Code", "JetBrains Mono", "Consolas",
+        monospace;
 }
 
 .term-body {
@@ -521,33 +617,57 @@ body {
     overflow-y: auto;
     position: relative;
     scroll-behavior: smooth;
-    font-family: "SF Mono", "Fira Code", "Cascadia Code", "JetBrains Mono", "Consolas", monospace;
+    font-family:
+        "SF Mono", "Fira Code", "Cascadia Code", "JetBrains Mono", "Consolas",
+        monospace;
     animation: screen-on 0.3s ease-out 0.3s both;
 }
-.term-body::-webkit-scrollbar { width: 6px; }
-.term-body::-webkit-scrollbar-track { background: transparent; }
-.term-body::-webkit-scrollbar-thumb { background: rgba(114,112,114,0.3); border-radius: 3px; }
-.term-body::-webkit-scrollbar-thumb:hover { background: rgba(114,112,114,0.5); }
+.term-body::-webkit-scrollbar {
+    width: 6px;
+}
+.term-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+.term-body::-webkit-scrollbar-thumb {
+    background: rgba(114, 112, 114, 0.3);
+    border-radius: 3px;
+}
+.term-body::-webkit-scrollbar-thumb:hover {
+    background: rgba(114, 112, 114, 0.5);
+}
 
 @keyframes screen-on {
-    0% { opacity: 0; }
-    50% { opacity: 0.5; }
-    100% { opacity: 1; }
+    0% {
+        opacity: 0;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 1;
+    }
 }
 
 .term-scanlines {
     position: absolute;
     top: 38px;
-    left: 0; right: 0;
+    left: 0;
+    right: 0;
     height: 360px;
-    background: repeating-linear-gradient(transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+    background: repeating-linear-gradient(
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.03) 2px,
+        rgba(0, 0, 0, 0.03) 4px
+    );
     pointer-events: none;
     z-index: 2;
 }
 .term-scroll-fade {
     position: absolute;
     top: 38px;
-    left: 0; right: 6px;
+    left: 0;
+    right: 6px;
     height: 30px;
     background: linear-gradient(to bottom, #19181a, transparent);
     pointer-events: none;
@@ -555,7 +675,9 @@ body {
     opacity: 0;
     transition: opacity 0.3s;
 }
-.term-scroll-fade.visible { opacity: 1; }
+.term-scroll-fade.visible {
+    opacity: 1;
+}
 
 .term-status-bar {
     height: 26px;
@@ -569,10 +691,20 @@ body {
     gap: 14px;
     position: relative;
     z-index: 5;
-    font-family: "SF Mono", "Fira Code", "Cascadia Code", "JetBrains Mono", "Consolas", monospace;
+    font-family:
+        "SF Mono", "Fira Code", "Cascadia Code", "JetBrains Mono", "Consolas",
+        monospace;
 }
-.term-status-right { margin-left: auto; display: flex; gap: 14px; }
-.term-status-section { display: flex; align-items: center; gap: 4px; }
+.term-status-right {
+    margin-left: auto;
+    display: flex;
+    gap: 14px;
+}
+.term-status-section {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
 
 /* Terminal line animations */
 .term-line {
@@ -589,34 +721,88 @@ body {
     animation: term-line-appear 0.12s ease-out forwards;
 }
 @keyframes term-line-appear {
-    to { opacity: 1; transform: translateY(0); }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* Terminal text colors */
-.t-prompt-user { color: #a9dc76; font-weight: 600; }
-.t-prompt-at { color: #727072; }
-.t-prompt-host { color: #78dce8; }
-.t-prompt-colon { color: #727072; }
-.t-prompt-path { color: #ab9df2; }
-.t-prompt-git { color: #ffd866; }
-.t-prompt-symbol { color: #ff6188; font-weight: 700; }
-.t-command { color: #fcfcfa; }
-.t-cmd-bin { color: #a9dc76; }
-.t-cmd-flag { color: #fc9867; }
-.t-cmd-str { color: #ffd866; }
-.t-cmd-kw { color: #ff6188; }
-.t-cmd-func { color: #78dce8; }
-.t-cmd-comment { color: #727072; font-style: italic; }
-.t-cmd-num { color: #ab9df2; }
-.t-cmd-op { color: #ff6188; }
-.t-output { color: #727072; }
-.t-out-ok { color: #a9dc76; }
-.t-out-warn { color: #ffd866; }
-.t-out-err { color: #ff6188; }
-.t-out-info { color: #78dce8; }
-.t-out-purple { color: #ab9df2; }
-.t-out-white { color: #fcfcfa; }
-.t-out-orange { color: #fc9867; }
+.t-prompt-user {
+    color: #a9dc76;
+    font-weight: 600;
+}
+.t-prompt-at {
+    color: #727072;
+}
+.t-prompt-host {
+    color: #78dce8;
+}
+.t-prompt-colon {
+    color: #727072;
+}
+.t-prompt-path {
+    color: #ab9df2;
+}
+.t-prompt-git {
+    color: #ffd866;
+}
+.t-prompt-symbol {
+    color: #ff6188;
+    font-weight: 700;
+}
+.t-command {
+    color: #fcfcfa;
+}
+.t-cmd-bin {
+    color: #a9dc76;
+}
+.t-cmd-flag {
+    color: #fc9867;
+}
+.t-cmd-str {
+    color: #ffd866;
+}
+.t-cmd-kw {
+    color: #ff6188;
+}
+.t-cmd-func {
+    color: #78dce8;
+}
+.t-cmd-comment {
+    color: #727072;
+    font-style: italic;
+}
+.t-cmd-num {
+    color: #ab9df2;
+}
+.t-cmd-op {
+    color: #ff6188;
+}
+.t-output {
+    color: #727072;
+}
+.t-out-ok {
+    color: #a9dc76;
+}
+.t-out-warn {
+    color: #ffd866;
+}
+.t-out-err {
+    color: #ff6188;
+}
+.t-out-info {
+    color: #78dce8;
+}
+.t-out-purple {
+    color: #ab9df2;
+}
+.t-out-white {
+    color: #fcfcfa;
+}
+.t-out-orange {
+    color: #fc9867;
+}
 
 .t-cursor {
     display: inline-block;
@@ -628,11 +814,20 @@ body {
     animation: t-cursor-blink 0.8s step-end infinite;
 }
 @keyframes t-cursor-blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0; }
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0;
+    }
 }
 
-.t-spinner-char { color: #78dce8; display: inline-block; width: 1ch; }
+.t-spinner-char {
+    color: #78dce8;
+    display: inline-block;
+    width: 1ch;
+}
 
 .t-progress-bar {
     width: 200px;
@@ -650,4 +845,7 @@ body {
     border-radius: 2px;
     transition: width 0.08s linear;
 }
-.t-progress-text { color: #727072; font-size: 13px; }
+.t-progress-text {
+    color: #727072;
+    font-size: 13px;
+}
