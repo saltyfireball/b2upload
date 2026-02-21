@@ -5,6 +5,7 @@
   "windows": ["*"],
   "permissions": [
     "core:default",
+    "core:app:default",
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-read-text"
   ]

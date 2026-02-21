@@ -325,6 +325,7 @@ document.addEventListener("drop", (e) => e.preventDefault());
 
 // ── About Modal ──
 const aboutModal = document.getElementById("about-modal");
+const aboutVersion = document.getElementById("about-version");
 const aboutBtn = document.getElementById("about-btn");
 const aboutCloseBtn = document.getElementById("about-close-btn");
 const terminalBody = document.getElementById("terminalBody");
@@ -341,6 +342,10 @@ const ABOUT_W = 650, ABOUT_H = 650;
 aboutBtn.addEventListener("click", async () => {
     aboutCancelled = false;
     aboutModal.classList.remove("hidden");
+    try {
+        const version = await window.__TAURI__.app.getVersion();
+        aboutVersion.textContent = `v${version}`;
+    } catch (_) {}
     await invoke("resize_window", { width: ABOUT_W, height: ABOUT_H });
     if (!aboutRunning) runTerminal();
 });
