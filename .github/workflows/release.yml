@@ -20,17 +20,17 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
-            target: aarch64-apple-darwin
-            args: --target aarch64-apple-darwin
-          - platform: macos-latest
-            target: x86_64-apple-darwin
-            args: --target x86_64-apple-darwin
+            target: universal-apple-darwin
+            args: --target universal-apple-darwin
+            rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             args: ""
+            rust_targets: x86_64-unknown-linux-gnu
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
             args: ""
+            rust_targets: x86_64-pc-windows-msvc
 
     runs-on: ${{ matrix.platform }}
 
@@ -41,9 +41,13 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
 
-      - name: Add Rust target
-        run: rustup target add ${{ matrix.target }}
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -57,17 +61,26 @@ jobs:
       - name: Build
         run: cargo tauri build ${{ matrix.args }}
 
+      - name: Collect build artifacts (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p artifacts
+          find src-tauri/target -path '*/release/bundle/*' -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" \) -exec cp {} artifacts/ \;
+          ls -la artifacts/
+
+      - name: Collect build artifacts (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts
+          Get-ChildItem -Path src-tauri/target -Recurse -Include *.msi,*.exe -File | Where-Object { $_.FullName -like '*release\bundle*' } | Copy-Item -Destination artifacts/
+          Get-ChildItem artifacts/
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-${{ matrix.target }}
-          path: |
-            src-tauri/target/**/release/bundle/**/*.dmg
-            src-tauri/target/**/release/bundle/**/*.app
-            src-tauri/target/**/release/bundle/**/*.deb
-            src-tauri/target/**/release/bundle/**/*.AppImage
-            src-tauri/target/**/release/bundle/**/*.msi
-            src-tauri/target/**/release/bundle/**/*.exe
+          path: artifacts/
 
   release:
     needs: build
