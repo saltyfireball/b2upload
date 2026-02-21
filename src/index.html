@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>B2Upload</title>
+        <link rel="stylesheet" href="style.css" />
+    </head>
+    <body>
+        <!-- Main View -->
+        <div id="main-view">
+            <div class="toolbar">
+                <span class="title">B2Upload</span>
+                <button id="history-btn" class="icon-btn" title="History">
+                    &#9776;
+                </button>
+                <button id="settings-btn" class="icon-btn" title="Settings">
+                    &#9881;
+                </button>
+            </div>
+
+            <div class="toggles">
+                <div class="toggle-group">
+                    <span class="toggle-label">Folder 2</span>
+                    <button
+                        id="mode-toggle"
+                        class="toggle"
+                        role="switch"
+                        aria-checked="true"
+                        title="Toggle folder mode"
+                    >
+                        <span class="toggle-thumb"></span>
+                    </button>
+                    <span class="toggle-label">Folder 1</span>
+                </div>
+                <div class="toggle-group">
+                    <span class="toggle-label">Auto-copy</span>
+                    <button
+                        id="clip-toggle"
+                        class="toggle on"
+                        role="switch"
+                        aria-checked="true"
+                        title="Toggle clipboard"
+                    >
+                        <span class="toggle-thumb"></span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="drop-zone">
+                <p>Drop file here</p>
+            </div>
+
+            <div id="results" class="hidden">
+                <div id="results-body"></div>
+                <button id="copy-all-btn">Copy All</button>
+            </div>
+
+            <div id="status"></div>
+        </div>
+
+        <!-- Settings View -->
+        <div id="settings-view" class="hidden">
+            <div class="toolbar">
+                <button id="back-btn" class="icon-btn" title="Back">
+                    &#8592;
+                </button>
+                <span class="title">Settings</span>
+                <button id="about-btn" class="icon-btn" title="About" style="font-size: 14px">
+                    About
+                </button>
+            </div>
+
+            <form id="settings-form">
+                <div class="settings-section">Connection</div>
+                <label>Domain<input type="text" name="DOMAIN" placeholder="media.example.com" /></label>
+                <label>Bucket Name<input type="text" name="BUCKET_NAME" placeholder="my-bucket" /></label>
+                <label>S3 Endpoint<input type="text" name="S3_ENDPOINT" placeholder="s3.us-east-005.backblazeb2.com" /></label>
+                <label>Application Key ID<input type="text" name="B2_APPLICATION_KEY_ID" /></label>
+                <label>Application Key<input type="password" name="B2_APPLICATION_KEY" /></label>
+
+                <div class="settings-section">Folders</div>
+                <div class="folder-row">
+                    <label class="folder-field">Folder 1<input type="text" name="FOLDER_1" placeholder="private" /></label>
+                    <label class="folder-field">Token<input type="text" name="FOLDER_1_TOKEN" placeholder="(optional)" /></label>
+                </div>
+                <div class="folder-row">
+                    <label class="folder-field">Folder 2<input type="text" name="FOLDER_2" placeholder="shared" /></label>
+                    <label class="folder-field">Token<input type="text" name="FOLDER_2_TOKEN" placeholder="(optional)" /></label>
+                </div>
+
+                <div class="settings-section">Upload Options</div>
+                <div class="settings-toggle-row">
+                    <span>Date folders (YYYY/MM/DD)</span>
+                    <button type="button" id="toggle-date-folders" class="toggle on" role="switch" aria-checked="true">
+                        <span class="toggle-thumb"></span>
+                    </button>
+                </div>
+                <div class="settings-toggle-row">
+                    <span>UUID filenames</span>
+                    <button type="button" id="toggle-uuid-filenames" class="toggle on" role="switch" aria-checked="true">
+                        <span class="toggle-thumb"></span>
+                    </button>
+                </div>
+                <div class="settings-toggle-row">
+                    <span>Overwrite uploads</span>
+                    <button type="button" id="toggle-overwrite-uploads" class="toggle" role="switch" aria-checked="false">
+                        <span class="toggle-thumb"></span>
+                    </button>
+                </div>
+
+                <button type="submit">Save</button>
+            </form>
+        </div>
+
+        <!-- History View -->
+        <div id="history-view" class="hidden">
+            <div class="toolbar">
+                <button id="history-back-btn" class="icon-btn" title="Back">
+                    &#8592;
+                </button>
+                <span class="title">History</span>
+                <button
+                    id="clear-history-btn"
+                    class="icon-btn"
+                    title="Clear history"
+                    style="font-size: 14px"
+                >
+                    Clear
+                </button>
+            </div>
+            <div id="history-list"></div>
+            <div id="history-empty" class="hidden">No uploads yet</div>
+        </div>
+
+        <!-- About Modal -->
+        <div id="about-modal" class="hidden">
+            <div class="about-container">
+                <div class="about-author">
+                    <span class="about-author-name">John</span> -
+                    <a href="mailto:saltyfireball@pm.me" class="about-author-link">saltyfireball@pm.me</a>
+                </div>
+                <div class="terminal">
+                    <div class="term-title-bar">
+                        <div class="term-dots">
+                            <div class="term-dot dot-red"></div>
+                            <div class="term-dot dot-yellow"></div>
+                            <div class="term-dot dot-green"></div>
+                        </div>
+                        <div class="term-title-text">b2upload — rust/tauri — 80x24</div>
+                    </div>
+                    <div class="term-scroll-fade" id="scrollFade"></div>
+                    <div class="term-scanlines"></div>
+                    <div class="term-body" id="terminalBody"></div>
+                    <div class="term-status-bar">
+                        <span class="term-status-section">NORMAL</span>
+                        <span class="term-status-section">zsh</span>
+                        <div class="term-status-right">
+                            <span class="term-status-section" id="statusSpinner"></span>
+                            <span class="term-status-section">utf-8</span>
+                            <span class="term-status-section" id="statusLine">ln 1</span>
+                        </div>
+                    </div>
+                </div>
+                <button id="about-close-btn" class="about-close">Close</button>
+            </div>
+        </div>
+
+        <script src="app.js"></script>
+    </body>
+</html>

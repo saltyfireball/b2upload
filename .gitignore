@@ -1,0 +1,10 @@
+# Rust build output
+src-tauri/target/
+
+# Environment/secrets
+.env
+.envrc
+
+# OS
+.DS_Store
+Thumbs.db

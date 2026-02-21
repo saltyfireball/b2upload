@@ -1,0 +1,11 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicegui/nicegui/main/nicegui/elements/lib/tauri/capabilities.schema.json",
+  "identifier": "default",
+  "description": "Default capabilities for B2Upload",
+  "windows": ["*"],
+  "permissions": [
+    "core:default",
+    "clipboard-manager:allow-write-text",
+    "clipboard-manager:allow-read-text"
+  ]
+}
