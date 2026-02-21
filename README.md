@@ -74,12 +74,71 @@ private/2026/02/20/screenshot.png
 Folder name blank, date off, UUID off:
 
 ```text
-Folder name blank, date off, UUID off:
-```
-
-```text
 screenshot.png
 ```
+
+## Using Tokens with a Cloudflare Worker
+
+The folder tokens are designed for use with a proxy that sits between your users and Backblaze B2. Instead of exposing your B2 bucket directly, you point a custom domain at a Cloudflare Worker that checks the `?token=` parameter before serving the file. This way you can share links that only work with the right token, and have different tokens for different folders.
+
+### How it works
+
+1. B2Upload appends `?token=abc123` to the URL it generates
+2. A user or browser requests `https://media.example.com/shared/photo.png?token=abc123`
+3. Your Cloudflare Worker checks the token against the expected value for that folder path
+4. If valid, the worker strips the token and fetches the file from B2
+5. If invalid, the worker returns 401 Unauthorized
+
+### Setup
+
+1. Create a [Cloudflare Worker](https://developers.cloudflare.com/workers/) on your account
+2. Set a custom route so it handles requests to your domain (e.g. `media.example.com/*`)
+3. Add your tokens as environment variables in the Worker settings (e.g. `SHARED_TOKEN`, `PRIVATE_TOKEN`)
+4. Deploy the worker code below
+5. In B2Upload settings, enter the same token values in the Folder 1/Folder 2 Token fields
+
+### Example Worker
+
+```js
+export default {
+    async fetch(request, env) {
+        const url = new URL(request.url);
+        const token = url.searchParams.get("token");
+        const path = url.pathname;
+
+        // Check token based on folder path
+        let authorized = false;
+
+        if (path.startsWith("/shared/")) {
+            authorized = token === env.SHARED_TOKEN;
+        } else if (path.startsWith("/private/")) {
+            authorized = token === env.PRIVATE_TOKEN;
+        }
+
+        if (!authorized) {
+            return new Response("Unauthorized", { status: 401 });
+        }
+
+        // Strip token before proxying to B2
+        url.searchParams.delete("token");
+
+        // Fetch from B2 — replace with your B2 download URL and bucket name
+        const b2Url = `https://f000.backblazeb2.com/file/your-bucket-name${path}`;
+        const response = await fetch(b2Url);
+
+        // Return with CORS headers
+        const headers = new Headers(response.headers);
+        headers.set("Access-Control-Allow-Origin", "*");
+
+        return new Response(response.body, {
+            status: response.status,
+            headers,
+        });
+    },
+};
+```
+
+You can extend this to support a master token that works across all paths, multiple tokens per folder, or any other access pattern you need.
 
 ## Tech Stack
 
@@ -93,11 +152,9 @@ screenshot.png
 
 The app is not currently signed with an Apple Developer certificate. On macOS, you may need to remove the quarantine attribute after installing:
 
-`````sh
+```sh
 xattr -cr /Applications/B2Upload.app
-````sh
-xattr -cr /Applications/B2Upload.app
-`````
+```
 
 ## Building
 
