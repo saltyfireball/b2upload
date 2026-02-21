@@ -65,7 +65,8 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           mkdir -p artifacts
-          find src-tauri/target -path '*/release/bundle/*' -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" \) -exec cp {} artifacts/ \;
+          # Simplified find: look for the extensions anywhere in the bundle folder
+          find src-tauri/target -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" \) | grep "bundle" | xargs -I {} cp {} artifacts/
           ls -la artifacts/
 
       - name: Collect build artifacts (Windows)
@@ -73,7 +74,8 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifacts
-          Get-ChildItem -Path src-tauri/target -Recurse -Include *.msi,*.exe -File | Where-Object { $_.FullName -like '*release\bundle*' } | Copy-Item -Destination artifacts/
+          # Look for msi/exe specifically in the release/bundle path
+          Get-ChildItem -Path src-tauri/target -Recurse -Include *.msi,*.exe | Where-Object { $_.FullName -match "bundle" } | Copy-Item -Destination artifacts/
           Get-ChildItem artifacts/
 
       - name: Upload artifacts
