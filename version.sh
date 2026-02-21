@@ -37,7 +37,8 @@ if [[ -n $(git status --porcelain) ]]; then
 fi
 
 # Extract version specifically from the [package] section
-current=$(grep -m 1 '^version = ' "$CARGO_TOML" | cut -d '"' -f 2)
+# Handles both 'version = "1.0.0"' and 'version="1.0.0"'
+current=$(grep -m 1 '^version' "$CARGO_TOML" | cut -d '"' -f 2)
 
 if [[ -z "$current" ]]; then
   echo -e "${CLR_ERROR}[ERROR] Could not find version in $CARGO_TOML${CLR_RESET}"
@@ -64,16 +65,18 @@ echo -e "${CLR_INFO}[BUMP]${CLR_RESET} $current -> ${CLR_BOLD}$new${CLR_RESET}"
 
 # --- Execution ---
 
-# Update Cargo.toml (only the first match)
-inplace_edit "0,/version = \"$current\"/s//version = \"$new\"/" "$CARGO_TOML"
+# Update Cargo.toml (Flexible regex for spaces around '=')
+inplace_edit "s/^version[[:space:]]*=[[:space:]]*\"$current\"/version = \"$new\"/" "$CARGO_TOML"
 
 # Update tauri.conf.json
-inplace_edit "s/\"version\": \"$current\"/\"version\": \"$new\"/" "$TAURI_CONF"
+inplace_edit "s/\"version\":[[:space:]]*\"$current\"/\"version\": \"$new\"/" "$TAURI_CONF"
 
-# Sync lockfile
-cargo generate-lockfile --manifest-path "$CARGO_TOML" 2>/dev/null
+# Force the lockfile to sync the new version
+# We use the package name from Cargo.toml to perform a targeted update
+PKG_NAME=$(grep -m 1 '^name' "$CARGO_TOML" | cut -d '"' -f 2)
+cargo update --manifest-path "$CARGO_TOML" -p "$PKG_NAME" --offline 2>/dev/null
 
-echo -e "${CLR_SUCCESS}[OK] Files updated to $new${CLR_RESET}"
+echo -e "${CLR_SUCCESS}[OK] Files and Lockfile updated to $new${CLR_RESET}"
 
 # --- Git Workflow ---
 
@@ -89,5 +92,5 @@ if [[ $confirm == [yY] ]]; then
   echo -e "${CLR_SUCCESS}[DONE] Pushed v$new${CLR_RESET}"
 else
   echo -e "${CLR_WARN}[ABORT] Version files updated but not committed.${CLR_RESET}"
-  echo -e "You will need to manually commit or revert changes in $CARGO_TOML and $TAURI_CONF"
+  echo -e "You will need to manually commit or revert changes."
 fi
