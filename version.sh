@@ -16,7 +16,7 @@ CLR_BOLD='\033[1m'
 
 # --- Helper Functions ---
 
-# Cross-platform sed -i wrapper (macOS vs Linux)
+# Cross-platform sed -i wrapper
 inplace_edit() {
   local pattern=$1
   local file=$2
@@ -29,9 +29,11 @@ inplace_edit() {
 
 # --- Pre-flight Checks ---
 
+# STRICT MODE: Exit if there are any uncommitted changes
 if [[ -n $(git status --porcelain) ]]; then
-  echo -e "${CLR_WARN}[WARN] You have uncommitted changes.${CLR_RESET}"
-  read -p "Continue anyway? (y/N): " confirm && [[ $confirm == [yY] ]] || exit 1
+  echo -e "${CLR_ERROR}[ERROR] Working directory is not clean.${CLR_RESET}"
+  echo -e "Please commit or stash your changes before bumping the version."
+  exit 1
 fi
 
 # Extract version specifically from the [package] section
@@ -86,5 +88,6 @@ if [[ $confirm == [yY] ]]; then
   git push origin main --follow-tags
   echo -e "${CLR_SUCCESS}[DONE] Pushed v$new${CLR_RESET}"
 else
-  echo -e "${CLR_WARN}[ABORT] Files remain updated but uncommitted.${CLR_RESET}"
+  echo -e "${CLR_WARN}[ABORT] Version files updated but not committed.${CLR_RESET}"
+  echo -e "You will need to manually commit or revert changes in $CARGO_TOML and $TAURI_CONF"
 fi
