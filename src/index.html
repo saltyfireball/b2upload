@@ -93,6 +93,7 @@
                 <label>S3 Endpoint<input type="text" name="S3_ENDPOINT" placeholder="s3.us-east-005.backblazeb2.com" /></label>
                 <label>Application Key ID<input type="text" name="B2_APPLICATION_KEY_ID" /></label>
                 <label>Application Key<input type="password" name="B2_APPLICATION_KEY" /></label>
+                <button type="button" id="test-connection-btn">Test Connection</button>
 
                 <div class="settings-section">Folders</div>
                 <div class="folder-row">
@@ -148,8 +149,13 @@
                         <span class="toggle-thumb"></span>
                     </button>
                 </div>
+                <div class="settings-toggle-row">
+                    <span>Desktop notifications</span>
+                    <button type="button" id="toggle-notifications" class="toggle on" role="switch" aria-checked="true">
+                        <span class="toggle-thumb"></span>
+                    </button>
+                </div>
 
-                <button type="button" id="test-connection-btn">Test Connection</button>
                 <button type="submit">Save</button>
             </form>
         </div>

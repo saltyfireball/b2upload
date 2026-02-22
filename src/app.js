@@ -264,6 +264,7 @@ clearHistoryBtn.addEventListener("click", async () => {
 const toggleDateFolders = document.getElementById("toggle-date-folders");
 const toggleUuidFilenames = document.getElementById("toggle-uuid-filenames");
 const toggleOverwriteUploads = document.getElementById("toggle-overwrite-uploads");
+const toggleNotifications = document.getElementById("toggle-notifications");
 
 function setSettingsToggle(btn, on) {
     btn.classList.toggle("on", on);
@@ -278,6 +279,9 @@ toggleUuidFilenames.addEventListener("click", () => {
 });
 toggleOverwriteUploads.addEventListener("click", () => {
     setSettingsToggle(toggleOverwriteUploads, !toggleOverwriteUploads.classList.contains("on"));
+});
+toggleNotifications.addEventListener("click", () => {
+    setSettingsToggle(toggleNotifications, !toggleNotifications.classList.contains("on"));
 });
 
 toggleTokenMode.addEventListener("click", () => {
@@ -313,6 +317,7 @@ settingsBtn.addEventListener("click", async () => {
     setSettingsToggle(toggleDateFolders, (settings.DATE_FOLDERS || "on") !== "off");
     setSettingsToggle(toggleUuidFilenames, (settings.UUID_FILENAMES || "on") !== "off");
     setSettingsToggle(toggleOverwriteUploads, (settings.OVERWRITE_UPLOADS || "no") === "yes");
+    setSettingsToggle(toggleNotifications, (settings.NOTIFICATIONS || "on") !== "off");
     // Token mode
     const isDynamic = (settings.TOKEN_MODE || "static") === "dynamic";
     setSettingsToggle(toggleTokenMode, isDynamic);
@@ -346,6 +351,7 @@ settingsForm.addEventListener("submit", async (e) => {
     values.DATE_FOLDERS = toggleDateFolders.classList.contains("on") ? "on" : "off";
     values.UUID_FILENAMES = toggleUuidFilenames.classList.contains("on") ? "on" : "off";
     values.OVERWRITE_UPLOADS = toggleOverwriteUploads.classList.contains("on") ? "yes" : "no";
+    values.NOTIFICATIONS = toggleNotifications.classList.contains("on") ? "on" : "off";
     values.TOKEN_MODE = toggleTokenMode.classList.contains("on") ? "dynamic" : "static";
     // If default TTL is "custom", use the custom input value
     if (defaultTtlSelect.value === "custom") {
@@ -490,9 +496,10 @@ async function handleFilePaths(paths) {
     showStatus(parts.join(" · "), failed > 0 ? "error" : "success");
     isUploading = false;
 
-    // OS notification when uploads finish
+    // OS notification when uploads finish (if enabled in settings)
     try {
-        if (window.__TAURI__.notification) {
+        const s = await invoke("get_settings");
+        if ((s.NOTIFICATIONS || "on") !== "off" && window.__TAURI__.notification) {
             const { sendNotification, isPermissionGranted, requestPermission } = window.__TAURI__.notification;
             let permitted = await isPermissionGranted();
             if (!permitted) permitted = (await requestPermission()) === "granted";
