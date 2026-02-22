@@ -171,6 +171,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    cursor: pointer;
     transition:
         border-color 0.2s,
         background 0.2s;
@@ -243,6 +244,23 @@ body {
 }
 .r-status.pending {
     color: #ffd866;
+}
+.r-status.pending::after {
+    content: "";
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 2px solid #ffd866;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .r-url {
@@ -377,6 +395,21 @@ body {
     background: #a9dc76;
 }
 
+#test-connection-btn {
+    margin-top: 4px;
+    padding: 10px;
+    background: #403e41;
+    color: #fcfcfa;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+#test-connection-btn:hover {
+    background: #5b595c;
+}
+
 #settings-form button[type="submit"] {
     margin-top: 4px;
     padding: 10px;
@@ -397,6 +430,25 @@ body {
     display: flex;
     flex-direction: column;
     height: 100vh;
+}
+
+#history-search-bar {
+    padding: 8px 16px;
+}
+
+#history-search {
+    width: 100%;
+    background: #221f22;
+    border: 1px solid #403e41;
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: #fcfcfa;
+    font-size: 13px;
+    outline: none;
+}
+
+#history-search:focus {
+    border-color: #78dce8;
 }
 
 #history-list {

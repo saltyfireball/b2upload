@@ -71,6 +71,14 @@ pub async fn upload_file(
     ttl: Option<u64>,
     cache: &S3ClientCache,
 ) -> Result<String, String> {
+    let input_path = Path::new(file_path);
+    if !input_path.exists() {
+        return Err(format!("File not found: {}", file_path));
+    }
+    if input_path.is_dir() {
+        return Err("Directories are not supported. Drop individual files instead.".to_string());
+    }
+
     let endpoint = settings.get("S3_ENDPOINT").ok_or("Missing S3_ENDPOINT")?;
     let key_id = settings
         .get("B2_APPLICATION_KEY_ID")
@@ -185,4 +193,29 @@ pub async fn upload_file(
     };
 
     Ok(url)
+}
+
+pub async fn test_connection(
+    settings: &HashMap<String, String>,
+    cache: &S3ClientCache,
+) -> Result<String, String> {
+    let endpoint = settings.get("S3_ENDPOINT").ok_or("Missing S3_ENDPOINT")?;
+    let key_id = settings
+        .get("B2_APPLICATION_KEY_ID")
+        .ok_or("Missing B2_APPLICATION_KEY_ID")?;
+    let secret_key = settings
+        .get("B2_APPLICATION_KEY")
+        .ok_or("Missing B2_APPLICATION_KEY")?;
+    let bucket = settings.get("BUCKET_NAME").ok_or("Missing BUCKET_NAME")?;
+
+    let client = cache.get_or_build(endpoint, key_id, secret_key);
+
+    client
+        .head_bucket()
+        .bucket(bucket)
+        .send()
+        .await
+        .map_err(|e| format!("Connection failed: {}", e))?;
+
+    Ok("Connection successful".to_string())
 }

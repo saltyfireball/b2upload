@@ -62,8 +62,8 @@
                 <input type="number" id="ttl-custom" class="hidden" min="1" placeholder="seconds" />
             </div>
 
-            <div id="drop-zone">
-                <p>Drop file here</p>
+            <div id="drop-zone" tabindex="0" role="button" aria-label="Drop files here or click to browse">
+                <p>Drop or click to upload</p>
             </div>
 
             <div id="results" class="hidden">
@@ -71,7 +71,7 @@
                 <button id="copy-all-btn">Copy All</button>
             </div>
 
-            <div id="status"></div>
+            <div id="status" role="status" aria-live="polite"></div>
         </div>
 
         <!-- Settings View -->
@@ -149,6 +149,7 @@
                     </button>
                 </div>
 
+                <button type="button" id="test-connection-btn">Test Connection</button>
                 <button type="submit">Save</button>
             </form>
         </div>
@@ -168,6 +169,9 @@
                 >
                     Clear
                 </button>
+            </div>
+            <div id="history-search-bar">
+                <input type="text" id="history-search" placeholder="Filter history..." />
             </div>
             <div id="history-list"></div>
             <div id="history-empty" class="hidden">No uploads yet</div>

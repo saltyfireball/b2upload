@@ -39,16 +39,36 @@ const defaultTtlCustom = document.getElementById("default-ttl-custom");
 const modeLeftLabel = document.querySelector(".toggle-group .toggle-label:first-child");
 const modeRightLabel = document.querySelector(".toggle-group .toggle-label:last-child");
 
-modeToggle.classList.add("on");
-clipToggle.classList.add("on");
+// Restore persisted toggle states
+const savedMode = localStorage.getItem("b2u_mode");
+if (savedMode === "folder1") {
+    mode = "folder1";
+    modeToggle.classList.remove("on");
+    modeToggle.setAttribute("aria-checked", "false");
+} else {
+    modeToggle.classList.add("on");
+}
+
+const savedClip = localStorage.getItem("b2u_autoClip");
+if (savedClip === "off") {
+    autoClip = false;
+    clipToggle.classList.remove("on");
+    clipToggle.setAttribute("aria-checked", "false");
+} else {
+    clipToggle.classList.add("on");
+}
 
 modeToggle.addEventListener("click", () => {
     const isOn = modeToggle.classList.toggle("on");
+    modeToggle.setAttribute("aria-checked", isOn);
     mode = isOn ? "folder2" : "folder1";
+    localStorage.setItem("b2u_mode", mode);
 });
 
 clipToggle.addEventListener("click", () => {
     autoClip = clipToggle.classList.toggle("on");
+    clipToggle.setAttribute("aria-checked", autoClip);
+    localStorage.setItem("b2u_autoClip", autoClip ? "on" : "off");
 });
 
 // TTL select: show custom input when "Custom" selected
@@ -144,18 +164,36 @@ copyAllBtn.addEventListener("click", async () => {
 });
 
 // History
-async function renderHistory() {
-    const history = await invoke("get_history");
+const historySearch = document.getElementById("history-search");
+let fullHistory = [];
+
+historySearch.addEventListener("input", () => {
+    renderHistoryList(historySearch.value.toLowerCase());
+});
+
+function renderHistoryList(filter) {
     historyList.innerHTML = "";
-    if (history.length === 0) {
+    const filtered = filter
+        ? fullHistory.filter(e => e.file.toLowerCase().includes(filter) || e.url.toLowerCase().includes(filter))
+        : fullHistory;
+    if (filtered.length === 0) {
         historyEmpty.classList.remove("hidden");
         return;
     }
     historyEmpty.classList.add("hidden");
-    for (const entry of history) {
-        const item = document.createElement("div");
-        item.className = "history-item";
-        item.innerHTML = `
+    const frag = document.createDocumentFragment();
+    for (const entry of filtered) {
+        frag.appendChild(createHistoryItem(entry));
+    }
+    historyList.appendChild(frag);
+}
+
+function createHistoryItem(entry) {
+    const item = document.createElement("div");
+    item.className = "history-item";
+    item.setAttribute("role", "button");
+    item.setAttribute("tabindex", "0");
+    item.innerHTML = `
       <div class="h-file">${escapeHtml(entry.file)}</div>
       <div class="h-url">${escapeHtml(entry.url)}</div>
       <div class="h-meta">
@@ -163,21 +201,38 @@ async function renderHistory() {
         <span>${entry.datetime}</span>
       </div>
     `;
-        item.addEventListener("click", async () => {
-            await invoke("copy_to_clipboard", { text: entry.url });
-            let copied = item.querySelector(".h-copied");
-            if (!copied) {
-                copied = document.createElement("div");
-                copied.className = "h-copied";
-                item.appendChild(copied);
-            }
-            copied.textContent = "Copied!";
-            setTimeout(() => {
-                copied.textContent = "";
-            }, 1500);
-        });
-        historyList.appendChild(item);
+    const copyHandler = async () => {
+        await invoke("copy_to_clipboard", { text: entry.url });
+        let copied = item.querySelector(".h-copied");
+        if (!copied) {
+            copied = document.createElement("div");
+            copied.className = "h-copied";
+            item.appendChild(copied);
+        }
+        copied.textContent = "Copied!";
+        setTimeout(() => { copied.textContent = ""; }, 1500);
+    };
+    item.addEventListener("click", copyHandler);
+    item.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); copyHandler(); }
+    });
+    return item;
+}
+
+async function renderHistory() {
+    fullHistory = await invoke("get_history");
+    historySearch.value = "";
+    historyList.innerHTML = "";
+    if (fullHistory.length === 0) {
+        historyEmpty.classList.remove("hidden");
+        return;
     }
+    historyEmpty.classList.add("hidden");
+    const frag = document.createDocumentFragment();
+    for (const entry of fullHistory) {
+        frag.appendChild(createHistoryItem(entry));
+    }
+    historyList.appendChild(frag);
 }
 
 function escapeHtml(str) {
@@ -200,6 +255,7 @@ historyBtn.addEventListener("click", async () => {
 historyBackBtn.addEventListener("click", () => showView(mainView));
 
 clearHistoryBtn.addEventListener("click", async () => {
+    if (fullHistory.length > 0 && !confirm("Clear all upload history?")) return;
     await invoke("clear_history");
     await renderHistory();
 });
@@ -318,6 +374,40 @@ settingsForm.addEventListener("submit", async (e) => {
     showStatus("Settings saved", "success");
 });
 
+// Test connection button
+document.getElementById("test-connection-btn").addEventListener("click", async () => {
+    const btn = document.getElementById("test-connection-btn");
+    btn.disabled = true;
+    btn.textContent = "Testing...";
+    try {
+        // Save current form values first so the backend uses them
+        const values = {};
+        for (const input of settingsForm.querySelectorAll("input, select")) {
+            if (input.name) values[input.name] = input.value;
+        }
+        values.DATE_FOLDERS = toggleDateFolders.classList.contains("on") ? "on" : "off";
+        values.UUID_FILENAMES = toggleUuidFilenames.classList.contains("on") ? "on" : "off";
+        values.OVERWRITE_UPLOADS = toggleOverwriteUploads.classList.contains("on") ? "yes" : "no";
+        values.TOKEN_MODE = toggleTokenMode.classList.contains("on") ? "dynamic" : "static";
+        if (defaultTtlSelect.value === "custom") {
+            const customVal = defaultTtlCustom.value;
+            if (customVal && parseInt(customVal, 10) > 0) values.DEFAULT_TTL = customVal;
+        }
+        await invoke("save_settings", { values });
+        const msg = await invoke("test_connection");
+        btn.textContent = msg;
+        btn.style.borderColor = "#a9dc76";
+    } catch (err) {
+        btn.textContent = err.toString();
+        btn.style.borderColor = "#ff6188";
+    }
+    btn.disabled = false;
+    setTimeout(() => {
+        btn.textContent = "Test Connection";
+        btn.style.borderColor = "";
+    }, 3000);
+});
+
 // Drag and drop - use Tauri's native drag-drop events
 async function handleFilePaths(paths) {
     if (paths.length === 0 || isUploading) return;
@@ -383,14 +473,15 @@ async function handleFilePaths(paths) {
         launch();
     });
 
-    // Auto-copy only for single file uploads
-    const didCopy = autoClip && lastResults.length === 1;
+    // Auto-copy URLs to clipboard
+    const didCopy = autoClip && lastResults.length > 0;
     if (didCopy) {
-        await invoke("copy_to_clipboard", { text: lastResults[0].url });
+        const text = lastResults.map((r) => r.url).join("\n");
+        await invoke("copy_to_clipboard", { text });
     }
 
     dropZone.classList.remove("uploading");
-    dropZone.querySelector("p").textContent = "Drop file here";
+    dropZone.querySelector("p").textContent = "Drop or click to upload";
 
     const parts = [];
     if (succeeded > 0) parts.push(`${succeeded} uploaded`);
@@ -398,6 +489,21 @@ async function handleFilePaths(paths) {
     if (didCopy) parts.push("copied to clipboard");
     showStatus(parts.join(" · "), failed > 0 ? "error" : "success");
     isUploading = false;
+
+    // OS notification when uploads finish
+    try {
+        if (window.__TAURI__.notification) {
+            const { sendNotification, isPermissionGranted, requestPermission } = window.__TAURI__.notification;
+            let permitted = await isPermissionGranted();
+            if (!permitted) permitted = (await requestPermission()) === "granted";
+            if (permitted) {
+                sendNotification({
+                    title: "B2Upload",
+                    body: parts.filter(p => !p.includes("clipboard")).join(" - "),
+                });
+            }
+        }
+    } catch (_) {}
 }
 
 // Tauri native drag-drop
@@ -409,6 +515,24 @@ getCurrentWebview().onDragDropEvent((event) => {
     } else if (event.payload.type === "drop") {
         dropZone.classList.remove("dragover");
         handleFilePaths(event.payload.paths);
+    }
+});
+
+// Click-to-browse file picker
+dropZone.addEventListener("click", async () => {
+    if (isUploading) return;
+    try {
+        const selected = await window.__TAURI__.dialog.open({ multiple: true });
+        if (selected) {
+            const paths = Array.isArray(selected) ? selected : [selected];
+            handleFilePaths(paths);
+        }
+    } catch (_) {}
+});
+dropZone.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        dropZone.click();
     }
 });
 
@@ -444,6 +568,12 @@ aboutBtn.addEventListener("click", async () => {
 });
 
 aboutCloseBtn.addEventListener("click", closeAbout);
+
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !aboutModal.classList.contains("hidden")) {
+        closeAbout();
+    }
+});
 
 async function closeAbout() {
     aboutCancelled = true;

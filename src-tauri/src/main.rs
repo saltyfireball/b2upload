@@ -82,6 +82,15 @@ fn clear_history(app: tauri::AppHandle) -> bool {
 }
 
 #[tauri::command]
+async fn test_connection(
+    app: tauri::AppHandle,
+    s3_cache: tauri::State<'_, uploader::S3ClientCache>,
+) -> Result<String, String> {
+    let settings = storage::get_settings(&app)?;
+    uploader::test_connection(&settings, &s3_cache).await
+}
+
+#[tauri::command]
 async fn resize_window(window: tauri::WebviewWindow, width: u32, height: u32) -> Result<(), String> {
     window
         .set_size(LogicalSize::new(width, height))
@@ -93,6 +102,8 @@ async fn resize_window(window: tauri::WebviewWindow, width: u32, height: u32) ->
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(uploader::S3ClientCache::new())
         .setup(|app| {
             let path = app
@@ -107,6 +118,7 @@ fn main() {
             save_settings,
             has_settings,
             upload_file,
+            test_connection,
             copy_to_clipboard,
             get_history,
             clear_history,
