@@ -10,6 +10,10 @@ on:
         description: "Tag to build (e.g. v1.0.0). Leave empty to build from HEAD without releasing."
         required: false
 
+env:
+  CARGO_INCREMENTAL: 0
+  # Note: RUSTFLAGS removed to ensure cross-platform compatibility without linker errors
+
 permissions:
   contents: write
 
@@ -35,6 +39,10 @@ jobs:
     runs-on: ${{ matrix.platform }}
 
     steps:
+      - name: Start Timer
+        shell: bash
+        run: echo "START_TIME=$EPOCHSECONDS" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
@@ -62,14 +70,13 @@ jobs:
         run: cargo binstall tauri-cli --force -y
 
       - name: Build
-        run: cargo tauri build ${{ matrix.args }}
+        run: cargo tauri build --locked ${{ matrix.args }}
 
       - name: Collect build artifacts (Unix)
         if: runner.os != 'Windows'
         run: |
           mkdir -p artifacts
           find src-tauri/target -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" \) | grep "bundle" | xargs -I {} cp {} artifacts/
-          ls -la artifacts/
 
       - name: Collect build artifacts (Windows)
         if: runner.os == 'Windows'
@@ -77,7 +84,6 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path artifacts
           Get-ChildItem -Path src-tauri/target -Recurse -Include *.msi,*.exe | Where-Object { $_.FullName -match "bundle" } | Copy-Item -Destination artifacts/
-          Get-ChildItem artifacts/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -86,13 +92,24 @@ jobs:
           path: artifacts/
           if-no-files-found: error
 
-      - name: Cleanup target directory
+      - name: Build Summary
         if: always()
-        # Forcing bash makes 'rm -rf' work on Windows, macOS, and Linux
         shell: bash
         run: |
-          echo "[INFO] Cleaning up build artifacts to save storage..."
-          rm -rf src-tauri/target
+          DURATION=$((EPOCHSECONDS - START_TIME))
+          MINUTES=$((DURATION / 60))
+          SECONDS=$((DURATION % 60))
+          echo "### Build Summary - ${{ matrix.platform }} 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+          echo "| Status | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Duration | ${MINUTES}m ${SECONDS}s |" >> $GITHUB_STEP_SUMMARY
+          echo "| Target | ${{ matrix.target }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Cleanup target directory
+        if: always()
+        shell: bash
+        run: rm -rf src-tauri/target
 
   release:
     needs: build
@@ -118,13 +135,12 @@ jobs:
         run: |
           mkdir release
           find artifacts -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.msi" -o -name "*.exe" \) -exec cp {} release/ \;
-          ls -la release/
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.name }}
-          name: ${{ steps.tag.outputs.name }}
+          name: Release ${{ steps.tag.outputs.name }}
           draft: false
           generate_release_notes: true
           files: release/*
