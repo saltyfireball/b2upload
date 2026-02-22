@@ -24,3 +24,12 @@ sha2 = "0.10"
 base64 = "0.22"
 tauri-plugin-dialog = "2.6.0"
 tauri-plugin-notification = "2.3.3"
+
+[profile.release]
+opt-level = 2 
+# Reduces parallel compilation bottlenecks
+codegen-units = 16 
+lto = "thin" 
+
+[profile.release.package."*"]
+opt-level = 2
