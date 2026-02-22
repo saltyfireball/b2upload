@@ -29,13 +29,15 @@ async fn has_settings(app: tauri::AppHandle) -> Result<bool, String> {
 async fn upload_file(
     app: tauri::AppHandle,
     s3_cache: tauri::State<'_, uploader::S3ClientCache>,
+    history_mutex: tauri::State<'_, storage::HistoryMutex>,
     file_path: String,
     mode: String,
     auto_clip: bool,
     ttl: Option<u64>,
 ) -> Result<String, String> {
-    let settings = storage::get_settings(&app)?;
-    let url = uploader::upload_file(&file_path, &mode, &settings, ttl, &s3_cache).await?;
+    let config = storage::get_config(&app);
+    let creds = storage::B2Credentials::load()?;
+    let url = uploader::upload_file(&file_path, &mode, &config, &creds, ttl, &s3_cache).await?;
 
     if auto_clip {
         app.clipboard()
@@ -58,7 +60,10 @@ async fn upload_file(
         "mode": mode,
     });
 
-    storage::add_history(&app, entry);
+    {
+        let _lock = history_mutex.0.lock().unwrap();
+        storage::add_history(&app, entry);
+    }
 
     Ok(url)
 }
@@ -76,9 +81,29 @@ fn get_history(app: tauri::AppHandle) -> Vec<Value> {
 }
 
 #[tauri::command]
-fn clear_history(app: tauri::AppHandle) -> bool {
+fn clear_history(
+    app: tauri::AppHandle,
+    history_mutex: tauri::State<'_, storage::HistoryMutex>,
+) -> bool {
+    let _lock = history_mutex.0.lock().unwrap();
     storage::clear_history(&app);
     true
+}
+
+#[tauri::command]
+fn delete_history_entry(
+    app: tauri::AppHandle,
+    history_mutex: tauri::State<'_, storage::HistoryMutex>,
+    url: String,
+) -> bool {
+    let _lock = history_mutex.0.lock().unwrap();
+    storage::delete_history_entry(&app, &url);
+    true
+}
+
+#[tauri::command]
+async fn get_saved_secret_keys() -> Result<Vec<String>, String> {
+    storage::get_saved_secret_keys()
 }
 
 #[tauri::command]
@@ -86,8 +111,9 @@ async fn test_connection(
     app: tauri::AppHandle,
     s3_cache: tauri::State<'_, uploader::S3ClientCache>,
 ) -> Result<String, String> {
-    let settings = storage::get_settings(&app)?;
-    uploader::test_connection(&settings, &s3_cache).await
+    let config = storage::get_config(&app);
+    let creds = storage::B2Credentials::load()?;
+    uploader::test_connection(&config, &creds, &s3_cache).await
 }
 
 #[tauri::command]
@@ -105,23 +131,27 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .manage(uploader::S3ClientCache::new())
+        .manage(storage::HistoryMutex::new())
         .setup(|app| {
             let path = app
                 .path()
                 .app_data_dir()
                 .expect("no app data dir");
             std::fs::create_dir_all(&path).ok();
+            storage::migrate_if_needed(&app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             get_settings,
             save_settings,
             has_settings,
+            get_saved_secret_keys,
             upload_file,
             test_connection,
             copy_to_clipboard,
             get_history,
             clear_history,
+            delete_history_entry,
             resize_window,
         ])
         .run(tauri::generate_context!())

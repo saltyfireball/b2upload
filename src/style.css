@@ -248,6 +248,9 @@ body {
 .r-status.error {
     color: #ff6188;
 }
+.r-status.cancelled {
+    color: #939293;
+}
 .r-status.pending {
     color: #ffd866;
 }
@@ -316,6 +319,24 @@ body {
     background: #5b595c;
 }
 
+#cancel-upload-btn {
+    display: block;
+    width: calc(100% - 32px);
+    margin: 8px 16px 0;
+    padding: 10px;
+    background: transparent;
+    border: 1px solid #ff6188;
+    border-radius: 6px;
+    color: #ff6188;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+#cancel-upload-btn:hover {
+    background: rgba(255, 97, 136, 0.1);
+}
+
 #status {
     padding: 8px 16px;
     font-size: 12px;
@@ -361,6 +382,18 @@ body {
 }
 #settings-form input:focus {
     border-color: #78dce8;
+}
+#settings-form input.input-error {
+    border-color: #ff6188;
+}
+
+#settings-error {
+    background: rgba(255, 97, 136, 0.1);
+    border: 1px solid #ff6188;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: #ff6188;
 }
 
 .settings-section {
@@ -483,6 +516,13 @@ body {
     border-color: #5b595c;
 }
 
+.history-item .h-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
 .history-item .h-file {
     font-size: 13px;
     font-weight: 600;
@@ -491,6 +531,26 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+
+.h-delete-btn {
+    background: none;
+    border: none;
+    color: #5b595c;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: color 0.15s, background 0.15s;
+}
+.h-delete-btn:hover {
+    color: #ff6188;
+    background: rgba(255, 97, 136, 0.1);
 }
 
 .history-item .h-url {

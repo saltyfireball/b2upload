@@ -22,7 +22,7 @@ export default {
             return new Response("Link expired", { status: 403 });
         }
 
-        // Validate token — signed over path + expires together
+        // Validate token - signed over path + expires together
         const expectedToken = await generateToken(
             path,
             expires,

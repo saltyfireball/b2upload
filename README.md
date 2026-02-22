@@ -17,8 +17,12 @@ Drop files onto the window, get shareable URLs back instantly.
 - **Two folder modes** - toggle between two independently configured folders (e.g. "private" and "shared")
 - **Auto-copy** - single-file uploads are automatically copied to the clipboard
 - **Upload history** - browse and copy URLs from previous uploads
-- **Encrypted credential storage** - settings are stored in the system keyring (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+- **Cancel uploads** - cancel in-progress batch uploads; in-flight files finish, remaining are skipped
+- **Individual history deletion** - remove single entries from upload history
+- **Settings validation** - required fields are validated before saving with visual feedback
+- **Encrypted credential storage** - sensitive keys stored individually in the system keyring (macOS Keychain, Windows Credential Manager, Linux Secret Service) with automatic memory zeroization; non-sensitive config stored in a local JSON file
 - **Configurable upload paths** - date folders, UUID filenames, overwrite protection, and per-folder URL tokens are all optional
+- **URL encoding** - filenames with spaces and special characters are properly percent-encoded
 
 ## Settings
 
@@ -140,7 +144,7 @@ export default {
         // Strip token before proxying to B2
         url.searchParams.delete("token");
 
-        // Fetch from B2 — replace with your B2 download URL and bucket name
+        // Fetch from B2 - replace with your B2 download URL and bucket name
         const b2Url = `https://f000.backblazeb2.com/file/your-bucket-name${path}`;
         const response = await fetch(b2Url);
 
@@ -183,7 +187,7 @@ export default {
             return new Response("Link expired", { status: 403 });
         }
 
-        // Validate token — signed over path + expires together
+        // Validate token - signed over path + expires together
         const expectedToken = await generateToken(
             path,
             expires,
@@ -258,7 +262,7 @@ wrangler deploy
 - **Backend:** Rust + Tauri 2
 - **Frontend:** Vanilla JS + CSS (no build step)
 - **Storage:** AWS S3 SDK (Backblaze B2 S3-compatible API)
-- **Credentials:** System keyring via `keyring` crate (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+- **Credentials:** Split storage -- non-sensitive config in `config.json`, sensitive keys individually in system keyring via `keyring` crate with `zeroize` for automatic memory clearing
 - **Async:** Tokio
 
 ## Installation
@@ -319,8 +323,8 @@ src/
 src-tauri/
   src/
     main.rs         # Tauri commands and app setup
-    storage.rs      # Keyring settings + JSON history
-    uploader.rs     # S3 upload logic and path construction
+    storage.rs      # Split-tier storage (config.json + keyring), B2Credentials with zeroize, history with mutex
+    uploader.rs     # S3 upload logic, path construction, percent-encoding
   tauri.conf.json   # App configuration
   Cargo.toml        # Rust dependencies
 ```

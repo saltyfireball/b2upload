@@ -65,6 +65,7 @@
             <div id="drop-zone" tabindex="0" role="button" aria-label="Drop files here or click to browse">
                 <p>Drop or click to upload</p>
             </div>
+            <button id="cancel-upload-btn" class="hidden">Cancel</button>
 
             <div id="results" class="hidden">
                 <div id="results-body"></div>
@@ -87,6 +88,7 @@
             </div>
 
             <form id="settings-form">
+                <div id="settings-error" class="hidden"></div>
                 <div class="settings-section">Connection</div>
                 <label>Domain<input type="text" name="DOMAIN" placeholder="media.example.com" /></label>
                 <label>Bucket Name<input type="text" name="BUCKET_NAME" placeholder="my-bucket" /></label>

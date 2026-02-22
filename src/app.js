@@ -26,6 +26,10 @@ let autoClip = true;
 let lastResults = []; // [{file, url}]
 let tokenMode = "static";
 let isUploading = false;
+let uploadCancelled = false;
+let notificationsEnabled = true;
+
+const cancelBtn = document.getElementById("cancel-upload-btn");
 
 // TTL elements
 const ttlBar = document.getElementById("ttl-bar");
@@ -153,6 +157,11 @@ function setRowError(card, msg) {
     card.querySelector(".r-status").className = "r-status error";
 }
 
+function setRowCancelled(card) {
+    card.querySelector(".r-status").textContent = "cancelled";
+    card.querySelector(".r-status").className = "r-status cancelled";
+}
+
 copyAllBtn.addEventListener("click", async () => {
     if (lastResults.length === 0) return;
     const text = lastResults.map((r) => r.url).join("\n");
@@ -194,14 +203,28 @@ function createHistoryItem(entry) {
     item.setAttribute("role", "button");
     item.setAttribute("tabindex", "0");
     item.innerHTML = `
-      <div class="h-file">${escapeHtml(entry.file)}</div>
+      <div class="h-header">
+        <div class="h-file">${escapeHtml(entry.file)}</div>
+        <button class="h-delete-btn" title="Delete entry">x</button>
+      </div>
       <div class="h-url">${escapeHtml(entry.url)}</div>
       <div class="h-meta">
         <span class="h-mode ${entry.mode === "shared" ? "shared" : ""}">${entry.mode}</span>
         <span>${entry.datetime}</span>
       </div>
     `;
-    const copyHandler = async () => {
+    // Delete button handler
+    item.querySelector(".h-delete-btn").addEventListener("click", async (e) => {
+        e.stopPropagation();
+        await invoke("delete_history_entry", { url: entry.url });
+        fullHistory = fullHistory.filter(h => h.url !== entry.url);
+        item.remove();
+        if (fullHistory.length === 0) {
+            historyEmpty.classList.remove("hidden");
+        }
+    });
+    const copyHandler = async (e) => {
+        if (e.target.closest(".h-delete-btn")) return;
         await invoke("copy_to_clipboard", { text: entry.url });
         let copied = item.querySelector(".h-copied");
         if (!copied) {
@@ -214,7 +237,7 @@ function createHistoryItem(entry) {
     };
     item.addEventListener("click", copyHandler);
     item.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); copyHandler(); }
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); copyHandler(e); }
     });
     return item;
 }
@@ -306,12 +329,25 @@ function updateModeLabels(folder1, folder2) {
     modeRightLabel.textContent = label2;
 }
 
+// Secret field names -- values are never sent back from the backend
+const SECRET_FIELDS = ["B2_APPLICATION_KEY_ID", "B2_APPLICATION_KEY", "FOLDER_1_TOKEN", "FOLDER_2_TOKEN", "TOKEN_SECRET"];
+let currentSavedSecretKeys = [];
+
 // Settings
 settingsBtn.addEventListener("click", async () => {
     const settings = await invoke("get_settings");
+    const savedKeys = await invoke("get_saved_secret_keys");
+    currentSavedSecretKeys = savedKeys;
     for (const [key, val] of Object.entries(settings)) {
         const input = settingsForm.elements[key];
         if (input) input.value = val;
+    }
+    // Secret fields: show placeholder if saved, clear the value
+    for (const key of SECRET_FIELDS) {
+        const input = settingsForm.elements[key];
+        if (!input) continue;
+        input.value = "";
+        input.placeholder = savedKeys.includes(key) ? "(saved)" : "";
     }
     // Populate toggles
     setSettingsToggle(toggleDateFolders, (settings.DATE_FOLDERS || "on") !== "off");
@@ -341,6 +377,15 @@ settingsBtn.addEventListener("click", async () => {
 
 backBtn.addEventListener("click", () => showView(mainView));
 
+const settingsError = document.getElementById("settings-error");
+
+// Clear red validation borders on focus
+settingsForm.addEventListener("focusin", (e) => {
+    if (e.target.tagName === "INPUT") {
+        e.target.classList.remove("input-error");
+    }
+});
+
 settingsForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const values = {};
@@ -360,7 +405,48 @@ settingsForm.addEventListener("submit", async (e) => {
             values.DEFAULT_TTL = customVal;
         }
     }
+
+    // Validate required fields
+    const required = ["DOMAIN", "BUCKET_NAME", "S3_ENDPOINT", "B2_APPLICATION_KEY_ID", "B2_APPLICATION_KEY"];
+    let hasError = false;
+    settingsForm.querySelectorAll(".input-error").forEach(el => el.classList.remove("input-error"));
+    settingsError.classList.add("hidden");
+
+    for (const key of required) {
+        const isEmpty = !values[key] || !values[key].trim();
+        // Secret fields that are already saved don't need new input
+        const isSavedSecret = SECRET_FIELDS.includes(key) && currentSavedSecretKeys.includes(key);
+        if (isEmpty && !isSavedSecret) {
+            const input = settingsForm.elements[key];
+            if (input) input.classList.add("input-error");
+            hasError = true;
+        }
+    }
+
+    // Basic hostname validation for S3_ENDPOINT
+    if (values.S3_ENDPOINT && values.S3_ENDPOINT.trim()) {
+        const endpointPattern = /^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)+$/;
+        if (!endpointPattern.test(values.S3_ENDPOINT.trim())) {
+            const input = settingsForm.elements["S3_ENDPOINT"];
+            if (input) input.classList.add("input-error");
+            hasError = true;
+        }
+    }
+
+    if (hasError) {
+        settingsError.textContent = "Please fill in all required connection fields";
+        settingsError.classList.remove("hidden");
+        return;
+    }
+
     await invoke("save_settings", { values });
+    // Update saved secret keys -- any newly entered secrets are now saved
+    for (const key of SECRET_FIELDS) {
+        if (values[key] && values[key].trim()) {
+            if (!currentSavedSecretKeys.includes(key)) currentSavedSecretKeys.push(key);
+        }
+    }
+    notificationsEnabled = values.NOTIFICATIONS !== "off";
     updateModeLabels(values.FOLDER_1, values.FOLDER_2);
     // Apply token mode to main view
     applyTokenMode(values.TOKEN_MODE);
@@ -414,20 +500,28 @@ document.getElementById("test-connection-btn").addEventListener("click", async (
     }, 3000);
 });
 
+// Cancel button
+cancelBtn.addEventListener("click", () => {
+    uploadCancelled = true;
+});
+
 // Drag and drop - use Tauri's native drag-drop events
 async function handleFilePaths(paths) {
     if (paths.length === 0 || isUploading) return;
     isUploading = true;
+    uploadCancelled = false;
 
     const hasSettings = await invoke("has_settings");
     if (!hasSettings) {
         showStatus("Please configure settings first", "error");
+        isUploading = false;
         return;
     }
 
     dropZone.classList.add("uploading");
     dropZone.querySelector("p").textContent =
         `Uploading ${paths.length} file${paths.length > 1 ? "s" : ""}...`;
+    cancelBtn.classList.remove("hidden");
     hideResults();
     resultsBox.classList.remove("hidden");
     showStatus("", "");
@@ -443,6 +537,7 @@ async function handleFilePaths(paths) {
 
     let succeeded = 0;
     let failed = 0;
+    let cancelled = 0;
 
     // Upload with max 5 concurrent
     const MAX_CONCURRENT = 5;
@@ -451,6 +546,16 @@ async function handleFilePaths(paths) {
     await new Promise((resolveAll) => {
         function launch() {
             while (active < MAX_CONCURRENT && next < rows.length) {
+                if (uploadCancelled) {
+                    // Mark remaining rows as cancelled
+                    for (let i = next; i < rows.length; i++) {
+                        setRowCancelled(rows[i].tr);
+                        cancelled++;
+                    }
+                    next = rows.length;
+                    if (active === 0) resolveAll();
+                    return;
+                }
                 const row = rows[next++];
                 active++;
                 (async () => {
@@ -479,6 +584,8 @@ async function handleFilePaths(paths) {
         launch();
     });
 
+    cancelBtn.classList.add("hidden");
+
     // Auto-copy URLs to clipboard
     const didCopy = autoClip && lastResults.length > 0;
     if (didCopy) {
@@ -492,14 +599,14 @@ async function handleFilePaths(paths) {
     const parts = [];
     if (succeeded > 0) parts.push(`${succeeded} uploaded`);
     if (failed > 0) parts.push(`${failed} failed`);
+    if (cancelled > 0) parts.push(`${cancelled} cancelled`);
     if (didCopy) parts.push("copied to clipboard");
-    showStatus(parts.join(" · "), failed > 0 ? "error" : "success");
+    showStatus(parts.join(" · "), failed > 0 ? "error" : cancelled > 0 ? "" : "success");
     isUploading = false;
 
     // OS notification when uploads finish (if enabled in settings)
     try {
-        const s = await invoke("get_settings");
-        if ((s.NOTIFICATIONS || "on") !== "off" && window.__TAURI__.notification) {
+        if (notificationsEnabled && window.__TAURI__.notification) {
             const { sendNotification, isPermissionGranted, requestPermission } = window.__TAURI__.notification;
             let permitted = await isPermissionGranted();
             if (!permitted) permitted = (await requestPermission()) === "granted";
@@ -861,6 +968,7 @@ async function runTerminal() {
     // Load folder names and token mode to update UI
     try {
         const settings = await invoke("get_settings");
+        notificationsEnabled = (settings.NOTIFICATIONS || "on") !== "off";
         updateModeLabels(settings.FOLDER_1, settings.FOLDER_2);
         applyTokenMode(settings.TOKEN_MODE || "static");
         if (settings.DEFAULT_TTL) {

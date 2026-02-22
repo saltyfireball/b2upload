@@ -7,12 +7,22 @@ use std::sync::Mutex;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use hmac::{Hmac, Mac};
+use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
 use sha2::Sha256;
 use std::collections::HashMap;
 use std::path::Path;
 use uuid::Uuid;
 
+use crate::storage::B2Credentials;
+
 type HmacSha256 = Hmac<Sha256>;
+
+// Encode everything except unreserved chars and forward slash
+const PATH_SEGMENT_SET: &AsciiSet = &NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'_')
+    .remove(b'.')
+    .remove(b'~');
 
 pub struct S3ClientCache {
     client: Mutex<Option<(String, S3Client)>>, // (cache_key, client)
@@ -64,10 +74,20 @@ fn parse_region(endpoint: &str) -> String {
         .to_string()
 }
 
+/// Percent-encode each segment of an object key, preserving `/` separators.
+fn encode_object_key(object_key: &str) -> String {
+    object_key
+        .split('/')
+        .map(|segment| utf8_percent_encode(segment, PATH_SEGMENT_SET).to_string())
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
 pub async fn upload_file(
     file_path: &str,
     mode: &str,
-    settings: &HashMap<String, String>,
+    config: &HashMap<String, String>,
+    creds: &B2Credentials,
     ttl: Option<u64>,
     cache: &S3ClientCache,
 ) -> Result<String, String> {
@@ -79,31 +99,29 @@ pub async fn upload_file(
         return Err("Directories are not supported. Drop individual files instead.".to_string());
     }
 
-    let endpoint = settings.get("S3_ENDPOINT").ok_or("Missing S3_ENDPOINT")?;
-    let key_id = settings
-        .get("B2_APPLICATION_KEY_ID")
-        .ok_or("Missing B2_APPLICATION_KEY_ID")?;
-    let secret_key = settings
-        .get("B2_APPLICATION_KEY")
-        .ok_or("Missing B2_APPLICATION_KEY")?;
-    let bucket = settings.get("BUCKET_NAME").ok_or("Missing BUCKET_NAME")?;
-    let domain = settings.get("DOMAIN").ok_or("Missing DOMAIN")?;
+    let endpoint = config.get("S3_ENDPOINT").ok_or("Missing S3_ENDPOINT")?;
+    let bucket = config.get("BUCKET_NAME").ok_or("Missing BUCKET_NAME")?;
+    let domain = config.get("DOMAIN").ok_or("Missing DOMAIN")?;
 
-    // Map mode to folder/token settings
-    let (folder_key, token_key) = if mode == "folder2" {
-        ("FOLDER_2", "FOLDER_2_TOKEN")
+    // Map mode to folder/token
+    let (folder, token) = if mode == "folder2" {
+        (
+            config.get("FOLDER_2").map(|s| s.as_str()).unwrap_or(""),
+            &creds.folder_2_token,
+        )
     } else {
-        ("FOLDER_1", "FOLDER_1_TOKEN")
+        (
+            config.get("FOLDER_1").map(|s| s.as_str()).unwrap_or(""),
+            &creds.folder_1_token,
+        )
     };
-    let folder = settings.get(folder_key).map(|s| s.as_str()).unwrap_or("");
-    let token = settings.get(token_key).map(|s| s.as_str()).unwrap_or("");
 
     // Read upload options
-    let use_date = settings.get("DATE_FOLDERS").map(|s| s.as_str()).unwrap_or("on") != "off";
-    let use_uuid = settings.get("UUID_FILENAMES").map(|s| s.as_str()).unwrap_or("on") != "off";
-    let allow_overwrite = settings.get("OVERWRITE_UPLOADS").map(|s| s.as_str()).unwrap_or("no") == "yes";
+    let use_date = config.get("DATE_FOLDERS").map(|s| s.as_str()).unwrap_or("on") != "off";
+    let use_uuid = config.get("UUID_FILENAMES").map(|s| s.as_str()).unwrap_or("on") != "off";
+    let allow_overwrite = config.get("OVERWRITE_UPLOADS").map(|s| s.as_str()).unwrap_or("no") == "yes";
 
-    let client = cache.get_or_build(endpoint, key_id, secret_key);
+    let client = cache.get_or_build(endpoint, &creds.key_id, &creds.app_key);
 
     let path = Path::new(file_path);
     let ext = path
@@ -166,13 +184,15 @@ pub async fn upload_file(
         .await
         .map_err(|e| format!("Upload failed: {}", e))?;
 
+    // Percent-encode the object key for the URL
+    let encoded_key = encode_object_key(&object_key);
+
     // Build URL with optional token
-    let token_mode = settings.get("TOKEN_MODE").map(|s| s.as_str()).unwrap_or("static");
+    let token_mode = config.get("TOKEN_MODE").map(|s| s.as_str()).unwrap_or("static");
 
     let url = if token_mode == "dynamic" {
         if let Some(ttl_secs) = ttl {
-            let secret = settings.get("TOKEN_SECRET").map(|s| s.as_str()).unwrap_or("");
-            if secret.is_empty() {
+            if creds.token_secret.is_empty() {
                 return Err("TOKEN_SECRET is required for dynamic token mode".to_string());
             }
             let now = std::time::SystemTime::now()
@@ -180,35 +200,30 @@ pub async fn upload_file(
                 .map_err(|e| e.to_string())?
                 .as_secs();
             let expires = now + ttl_secs;
-            let path = format!("/{}", object_key);
-            let sig = generate_hmac_token(&path, expires, secret);
-            format!("https://{}/{}?token={}&expires={}", domain, object_key, sig, expires)
+            let hmac_path = format!("/{}", object_key);
+            let sig = generate_hmac_token(&hmac_path, expires, &creds.token_secret);
+            format!("https://{}/{}?token={}&expires={}", domain, encoded_key, sig, expires)
         } else {
-            format!("https://{}/{}", domain, object_key)
+            format!("https://{}/{}", domain, encoded_key)
         }
     } else if token.is_empty() {
-        format!("https://{}/{}", domain, object_key)
+        format!("https://{}/{}", domain, encoded_key)
     } else {
-        format!("https://{}/{}?token={}", domain, object_key, token)
+        format!("https://{}/{}?token={}", domain, encoded_key, token)
     };
 
     Ok(url)
 }
 
 pub async fn test_connection(
-    settings: &HashMap<String, String>,
+    config: &HashMap<String, String>,
+    creds: &B2Credentials,
     cache: &S3ClientCache,
 ) -> Result<String, String> {
-    let endpoint = settings.get("S3_ENDPOINT").ok_or("Missing S3_ENDPOINT")?;
-    let key_id = settings
-        .get("B2_APPLICATION_KEY_ID")
-        .ok_or("Missing B2_APPLICATION_KEY_ID")?;
-    let secret_key = settings
-        .get("B2_APPLICATION_KEY")
-        .ok_or("Missing B2_APPLICATION_KEY")?;
-    let bucket = settings.get("BUCKET_NAME").ok_or("Missing BUCKET_NAME")?;
+    let endpoint = config.get("S3_ENDPOINT").ok_or("Missing S3_ENDPOINT")?;
+    let bucket = config.get("BUCKET_NAME").ok_or("Missing BUCKET_NAME")?;
 
-    let client = cache.get_or_build(endpoint, key_id, secret_key);
+    let client = cache.get_or_build(endpoint, &creds.key_id, &creds.app_key);
 
     client
         .head_bucket()
