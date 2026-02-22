@@ -70,7 +70,7 @@ jobs:
         run: cargo binstall tauri-cli --force -y
 
       - name: Build
-        run: cargo tauri build --locked ${{ matrix.args }}
+        run: cargo tauri build ${{ matrix.args }} -- --locked
 
       - name: Collect build artifacts (Unix)
         if: runner.os != 'Windows'
