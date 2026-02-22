@@ -328,3 +328,7 @@ src-tauri/
   tauri.conf.json   # App configuration
   Cargo.toml        # Rust dependencies
 ```
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

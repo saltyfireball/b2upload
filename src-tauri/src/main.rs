@@ -28,7 +28,6 @@ async fn has_settings(app: tauri::AppHandle) -> Result<bool, String> {
 #[tauri::command]
 async fn upload_file(
     app: tauri::AppHandle,
-    s3_cache: tauri::State<'_, uploader::S3ClientCache>,
     history_mutex: tauri::State<'_, storage::HistoryMutex>,
     file_path: String,
     mode: String,
@@ -37,7 +36,7 @@ async fn upload_file(
 ) -> Result<String, String> {
     let config = storage::get_config(&app);
     let creds = storage::B2Credentials::load()?;
-    let url = uploader::upload_file(&file_path, &mode, &config, &creds, ttl, &s3_cache).await?;
+    let url = uploader::upload_file(&file_path, &mode, &config, &creds, ttl).await?;
 
     if auto_clip {
         app.clipboard()
@@ -109,11 +108,10 @@ async fn get_saved_secret_keys() -> Result<Vec<String>, String> {
 #[tauri::command]
 async fn test_connection(
     app: tauri::AppHandle,
-    s3_cache: tauri::State<'_, uploader::S3ClientCache>,
 ) -> Result<String, String> {
     let config = storage::get_config(&app);
     let creds = storage::B2Credentials::load()?;
-    uploader::test_connection(&config, &creds, &s3_cache).await
+    uploader::test_connection(&config, &creds).await
 }
 
 #[tauri::command]
@@ -130,7 +128,6 @@ fn main() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
-        .manage(uploader::S3ClientCache::new())
         .manage(storage::HistoryMutex::new())
         .setup(|app| {
             let path = app
@@ -138,7 +135,6 @@ fn main() {
                 .app_data_dir()
                 .expect("no app data dir");
             std::fs::create_dir_all(&path).ok();
-            storage::migrate_if_needed(&app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

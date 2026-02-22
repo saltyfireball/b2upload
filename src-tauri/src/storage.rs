@@ -9,9 +9,6 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 const SERVICE: &str = "b2upload";
 const SECRETS_ACCOUNT: &str = "secrets";
 
-// Old single-entry account name (for migration from pre-split storage)
-const OLD_ACCOUNT: &str = "settings";
-
 // Keys stored in config.json (non-sensitive)
 const CONFIG_KEYS: &[&str] = &[
     "DOMAIN",
@@ -108,77 +105,6 @@ fn write_config(app: &AppHandle, config: &HashMap<String, String>) -> Result<(),
     let path = config_path(app);
     let json = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
     fs::write(&path, json).map_err(|e| format!("Config write error: {}", e))
-}
-
-// --- Migration from old single-entry storage ---
-
-pub fn migrate_if_needed(app: &AppHandle) {
-    let entry = match keyring::Entry::new(SERVICE, OLD_ACCOUNT) {
-        Ok(e) => e,
-        Err(_) => return,
-    };
-
-    let mut raw_json = match entry.get_password() {
-        Ok(j) => j,
-        Err(_) => return, // No old entry, nothing to migrate
-    };
-
-    let old_settings: HashMap<String, String> = match serde_json::from_str(&raw_json) {
-        Ok(m) => m,
-        Err(_) => {
-            raw_json.zeroize();
-            return;
-        }
-    };
-
-    // Zeroize the raw JSON immediately after parsing
-    raw_json.zeroize();
-
-    if old_settings.is_empty() {
-        return;
-    }
-
-    #[cfg(debug_assertions)]
-    eprintln!("[migration] Found old settings entry with {} keys, migrating...", old_settings.len());
-
-    // Split into config file values
-    let mut config: HashMap<String, String> = HashMap::new();
-    for &key in CONFIG_KEYS {
-        if let Some(val) = old_settings.get(key) {
-            config.insert(key.to_string(), val.clone());
-        }
-    }
-
-    // Write config file
-    if let Err(e) = write_config(app, &config) {
-        eprintln!("[migration] Failed to write config.json: {}", e);
-        return;
-    }
-
-    // Build and save credentials as a single JSON blob
-    let creds = B2Credentials {
-        key_id: old_settings.get("B2_APPLICATION_KEY_ID").cloned().unwrap_or_default(),
-        app_key: old_settings.get("B2_APPLICATION_KEY").cloned().unwrap_or_default(),
-        folder_1_token: old_settings.get("FOLDER_1_TOKEN").cloned().unwrap_or_default(),
-        folder_2_token: old_settings.get("FOLDER_2_TOKEN").cloned().unwrap_or_default(),
-        token_secret: old_settings.get("TOKEN_SECRET").cloned().unwrap_or_default(),
-    };
-
-    if let Err(e) = creds.save() {
-        eprintln!("[migration] Failed to write secrets to keyring: {}", e);
-        return;
-    }
-
-    // Delete old entry only after all writes succeed
-    match entry.delete_credential() {
-        Ok(()) => {
-            #[cfg(debug_assertions)]
-            eprintln!("[migration] Successfully migrated and deleted old entry");
-        }
-        Err(e) => {
-            eprintln!("[migration] Warning: failed to delete old entry: {}", e);
-        }
-    }
 }
 
 // Secret key names used for zeroizing values in HashMaps

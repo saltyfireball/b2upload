@@ -3,7 +3,6 @@ use aws_credential_types::Credentials;
 use aws_sdk_s3::config::Builder as S3ConfigBuilder;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::Client as S3Client;
-use std::sync::Mutex;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use hmac::{Hmac, Mac};
@@ -12,6 +11,7 @@ use sha2::Sha256;
 use std::collections::HashMap;
 use std::path::Path;
 use uuid::Uuid;
+use zeroize::Zeroizing;
 
 use crate::storage::B2Credentials;
 
@@ -24,35 +24,33 @@ const PATH_SEGMENT_SET: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'.')
     .remove(b'~');
 
-pub struct S3ClientCache {
-    client: Mutex<Option<(String, S3Client)>>, // (cache_key, client)
-}
+/// Build a fresh S3 client with secure credential handoff.
+/// The Zeroizing wrappers wipe the credential copies immediately after
+/// the AWS SDK copies them into its internal Arc buffer.
+fn build_client(endpoint: &str, creds: &B2Credentials) -> S3Client {
+    let region = parse_region(endpoint);
 
-impl S3ClientCache {
-    pub fn new() -> Self {
-        Self { client: Mutex::new(None) }
-    }
+    // Wrap in Zeroizing so originals are wiped after handoff to Credentials::new()
+    let key_id = Zeroizing::new(creds.key_id.clone());
+    let secret_key = Zeroizing::new(creds.app_key.clone());
 
-    fn get_or_build(&self, endpoint: &str, key_id: &str, secret_key: &str) -> S3Client {
-        let cache_key = format!("{}:{}:{}", endpoint, key_id, secret_key);
-        let mut guard = self.client.lock().unwrap();
-        if let Some((ref k, ref c)) = *guard {
-            if *k == cache_key {
-                return c.clone();
-            }
-        }
-        let region = parse_region(endpoint);
-        let creds = Credentials::new(key_id, secret_key, None, None, "b2upload");
-        let config = S3ConfigBuilder::new()
-            .endpoint_url(format!("https://{}", endpoint))
-            .region(Region::new(region))
-            .credentials_provider(creds)
-            .force_path_style(true)
-            .build();
-        let client = S3Client::from_conf(config);
-        *guard = Some((cache_key, client.clone()));
-        client
-    }
+    let aws_creds = Credentials::new(
+        key_id.as_str(),
+        secret_key.as_str(),
+        None,
+        None,
+        "b2upload",
+    );
+    // key_id and secret_key Zeroizing wrappers drop here, wiping the cloned strings
+
+    let config = S3ConfigBuilder::new()
+        .endpoint_url(format!("https://{}", endpoint))
+        .region(Region::new(region))
+        .credentials_provider(aws_creds)
+        .force_path_style(true)
+        .build();
+
+    S3Client::from_conf(config)
 }
 
 fn generate_hmac_token(path: &str, expires: u64, secret: &str) -> String {
@@ -89,7 +87,6 @@ pub async fn upload_file(
     config: &HashMap<String, String>,
     creds: &B2Credentials,
     ttl: Option<u64>,
-    cache: &S3ClientCache,
 ) -> Result<String, String> {
     let input_path = Path::new(file_path);
     if !input_path.exists() {
@@ -121,7 +118,8 @@ pub async fn upload_file(
     let use_uuid = config.get("UUID_FILENAMES").map(|s| s.as_str()).unwrap_or("on") != "off";
     let allow_overwrite = config.get("OVERWRITE_UPLOADS").map(|s| s.as_str()).unwrap_or("no") == "yes";
 
-    let client = cache.get_or_build(endpoint, &creds.key_id, &creds.app_key);
+    // Build a fresh client for this operation; drops when function returns
+    let client = build_client(endpoint, creds);
 
     let path = Path::new(file_path);
     let ext = path
@@ -212,18 +210,19 @@ pub async fn upload_file(
         format!("https://{}/{}?token={}", domain, encoded_key, token)
     };
 
+    // client drops here -- AWS SDK zeroizes its internal credential buffers
     Ok(url)
 }
 
 pub async fn test_connection(
     config: &HashMap<String, String>,
     creds: &B2Credentials,
-    cache: &S3ClientCache,
 ) -> Result<String, String> {
     let endpoint = config.get("S3_ENDPOINT").ok_or("Missing S3_ENDPOINT")?;
     let bucket = config.get("BUCKET_NAME").ok_or("Missing BUCKET_NAME")?;
 
-    let client = cache.get_or_build(endpoint, &creds.key_id, &creds.app_key);
+    // Build a fresh client for this operation; drops when function returns
+    let client = build_client(endpoint, creds);
 
     client
         .head_bucket()
@@ -232,5 +231,6 @@ pub async fn test_connection(
         .await
         .map_err(|e| format!("Connection failed: {}", e))?;
 
+    // client drops here -- AWS SDK zeroizes its internal credential buffers
     Ok("Connection successful".to_string())
 }
