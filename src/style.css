@@ -199,7 +199,7 @@ body {
 /* Results */
 #results {
     margin: 8px 16px 0;
-    max-height: 340px;
+    max-height: 335px;
     overflow-y: auto;
     border: 1px solid #403e41;
     border-radius: 8px;
