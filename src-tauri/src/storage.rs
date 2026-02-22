@@ -19,6 +19,7 @@ pub fn save_settings(_app: &AppHandle, values: HashMap<String, String>) -> Resul
     let json = serde_json::to_string(&values).map_err(|e| e.to_string())?;
     let entry = keyring::Entry::new(SERVICE, ACCOUNT).map_err(|e| e.to_string())?;
     entry.set_password(&json).map_err(|e| format!("Keyring set error: {}", e))?;
+    #[cfg(debug_assertions)]
     eprintln!("[keyring] Saved {} keys", values.len());
     Ok(())
 }
@@ -60,15 +61,22 @@ pub fn get_history(app: &AppHandle) -> Vec<Value> {
     }
 }
 
+const MAX_HISTORY: usize = 200;
+
 pub fn add_history(app: &AppHandle, entry: Value) {
     let path = history_path(app);
     let mut history = get_history(app);
     history.insert(0, entry);
+    history.truncate(MAX_HISTORY);
     let json = serde_json::to_string_pretty(&history).unwrap_or_else(|_| "[]".to_string());
-    fs::write(&path, json).ok();
+    if let Err(e) = fs::write(&path, json) {
+        eprintln!("[history] Failed to write: {}", e);
+    }
 }
 
 pub fn clear_history(app: &AppHandle) {
     let path = history_path(app);
-    fs::write(&path, "[]").ok();
+    if let Err(e) = fs::write(&path, "[]") {
+        eprintln!("[history] Failed to clear: {}", e);
+    }
 }

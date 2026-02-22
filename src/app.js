@@ -25,6 +25,7 @@ let mode = "folder2";
 let autoClip = true;
 let lastResults = []; // [{file, url}]
 let tokenMode = "static";
+let isUploading = false;
 
 // TTL elements
 const ttlBar = document.getElementById("ttl-bar");
@@ -186,7 +187,9 @@ function escapeHtml(str) {
 }
 
 function escapeAttr(str) {
-    return str.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    const el = document.createElement("span");
+    el.textContent = str;
+    return el.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 historyBtn.addEventListener("click", async () => {
@@ -317,7 +320,8 @@ settingsForm.addEventListener("submit", async (e) => {
 
 // Drag and drop - use Tauri's native drag-drop events
 async function handleFilePaths(paths) {
-    if (paths.length === 0) return;
+    if (paths.length === 0 || isUploading) return;
+    isUploading = true;
 
     const hasSettings = await invoke("has_settings");
     if (!hasSettings) {
@@ -333,7 +337,7 @@ async function handleFilePaths(paths) {
     showStatus("", "");
 
     const rows = paths.map((p) => {
-        const name = p.split("/").pop() || p.split("\\").pop() || p;
+        const name = p.split(/[\\/]/).pop() || p;
         return {
             name,
             path: p,
@@ -393,6 +397,7 @@ async function handleFilePaths(paths) {
     if (failed > 0) parts.push(`${failed} failed`);
     if (didCopy) parts.push("copied to clipboard");
     showStatus(parts.join(" · "), failed > 0 ? "error" : "success");
+    isUploading = false;
 }
 
 // Tauri native drag-drop

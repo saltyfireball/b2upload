@@ -111,14 +111,16 @@ pub async fn upload_file(
 
     // Overwrite guard: only check when overwrite is off AND uuid is off (original filenames)
     if !allow_overwrite && !use_uuid {
-        let head_result = client
-            .head_object()
-            .bucket(bucket)
-            .key(&object_key)
-            .send()
-            .await;
-        if head_result.is_ok() {
-            return Err("File already exists (overwrite is disabled)".to_string());
+        match client.head_object().bucket(bucket).key(&object_key).send().await {
+            Ok(_) => return Err("File already exists (overwrite is disabled)".to_string()),
+            Err(e) => {
+                let is_not_found = e.as_service_error()
+                    .map(|se| se.is_not_found())
+                    .unwrap_or(false);
+                if !is_not_found {
+                    return Err(format!("Failed to check existing file: {}", e));
+                }
+            }
         }
     }
 
