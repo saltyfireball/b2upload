@@ -3,6 +3,7 @@ use aws_credential_types::Credentials;
 use aws_sdk_s3::config::Builder as S3ConfigBuilder;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::Client as S3Client;
+use std::sync::Mutex;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use hmac::{Hmac, Mac};
@@ -12,6 +13,37 @@ use std::path::Path;
 use uuid::Uuid;
 
 type HmacSha256 = Hmac<Sha256>;
+
+pub struct S3ClientCache {
+    client: Mutex<Option<(String, S3Client)>>, // (cache_key, client)
+}
+
+impl S3ClientCache {
+    pub fn new() -> Self {
+        Self { client: Mutex::new(None) }
+    }
+
+    fn get_or_build(&self, endpoint: &str, key_id: &str, secret_key: &str) -> S3Client {
+        let cache_key = format!("{}:{}:{}", endpoint, key_id, secret_key);
+        let mut guard = self.client.lock().unwrap();
+        if let Some((ref k, ref c)) = *guard {
+            if *k == cache_key {
+                return c.clone();
+            }
+        }
+        let region = parse_region(endpoint);
+        let creds = Credentials::new(key_id, secret_key, None, None, "b2upload");
+        let config = S3ConfigBuilder::new()
+            .endpoint_url(format!("https://{}", endpoint))
+            .region(Region::new(region))
+            .credentials_provider(creds)
+            .force_path_style(true)
+            .build();
+        let client = S3Client::from_conf(config);
+        *guard = Some((cache_key, client.clone()));
+        client
+    }
+}
 
 fn generate_hmac_token(path: &str, expires: u64, secret: &str) -> String {
     let message = format!("{}:{}", path, expires);
@@ -23,19 +55,13 @@ fn generate_hmac_token(path: &str, expires: u64, secret: &str) -> String {
 }
 
 fn parse_region(endpoint: &str) -> String {
-    // e.g. s3.us-east-005.backblazeb2.com → us-east-005
-    let re = regex_lite(endpoint);
-    re.unwrap_or_else(|| "us-east-005".to_string())
-}
-
-fn regex_lite(endpoint: &str) -> Option<String> {
-    // s3.REGION.backblazeb2.com
-    let parts: Vec<&str> = endpoint.split('.').collect();
-    if parts.len() >= 3 && parts[0] == "s3" {
-        Some(parts[1].to_string())
-    } else {
-        None
-    }
+    // Extract region from "s3.REGION.backblazeb2.com"
+    endpoint
+        .split('.')
+        .nth(1)
+        .filter(|_| endpoint.starts_with("s3."))
+        .unwrap_or("us-east-005")
+        .to_string()
 }
 
 pub async fn upload_file(
@@ -43,6 +69,7 @@ pub async fn upload_file(
     mode: &str,
     settings: &HashMap<String, String>,
     ttl: Option<u64>,
+    cache: &S3ClientCache,
 ) -> Result<String, String> {
     let endpoint = settings.get("S3_ENDPOINT").ok_or("Missing S3_ENDPOINT")?;
     let key_id = settings
@@ -68,18 +95,7 @@ pub async fn upload_file(
     let use_uuid = settings.get("UUID_FILENAMES").map(|s| s.as_str()).unwrap_or("on") != "off";
     let allow_overwrite = settings.get("OVERWRITE_UPLOADS").map(|s| s.as_str()).unwrap_or("no") == "yes";
 
-    let region = parse_region(endpoint);
-
-    let creds = Credentials::new(key_id, secret_key, None, None, "b2upload");
-
-    let config = S3ConfigBuilder::new()
-        .endpoint_url(format!("https://{}", endpoint))
-        .region(Region::new(region))
-        .credentials_provider(creds)
-        .force_path_style(true)
-        .build();
-
-    let client = S3Client::from_conf(config);
+    let client = cache.get_or_build(endpoint, key_id, secret_key);
 
     let path = Path::new(file_path);
     let ext = path
@@ -128,10 +144,15 @@ pub async fn upload_file(
         .await
         .map_err(|e| format!("Failed to read file: {}", e))?;
 
+    let content_type = mime_guess::from_path(path)
+        .first_or_octet_stream()
+        .to_string();
+
     client
         .put_object()
         .bucket(bucket)
         .key(&object_key)
+        .content_type(content_type)
         .body(body)
         .send()
         .await

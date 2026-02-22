@@ -28,13 +28,14 @@ async fn has_settings(app: tauri::AppHandle) -> Result<bool, String> {
 #[tauri::command]
 async fn upload_file(
     app: tauri::AppHandle,
+    s3_cache: tauri::State<'_, uploader::S3ClientCache>,
     file_path: String,
     mode: String,
     auto_clip: bool,
     ttl: Option<u64>,
 ) -> Result<String, String> {
     let settings = storage::get_settings(&app)?;
-    let url = uploader::upload_file(&file_path, &mode, &settings, ttl).await?;
+    let url = uploader::upload_file(&file_path, &mode, &settings, ttl, &s3_cache).await?;
 
     if auto_clip {
         app.clipboard()
@@ -92,6 +93,7 @@ async fn resize_window(window: tauri::WebviewWindow, width: u32, height: u32) ->
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
+        .manage(uploader::S3ClientCache::new())
         .setup(|app| {
             let path = app
                 .path()
