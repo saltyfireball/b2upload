@@ -9,6 +9,7 @@
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-read-text",
     "dialog:allow-open",
+    "dialog:allow-ask",
     "notification:default"
   ]
 }

@@ -278,7 +278,13 @@ historyBtn.addEventListener("click", async () => {
 historyBackBtn.addEventListener("click", () => showView(mainView));
 
 clearHistoryBtn.addEventListener("click", async () => {
-    if (fullHistory.length > 0 && !confirm("Clear all upload history?")) return;
+    if (fullHistory.length > 0) {
+        const confirmed = await window.__TAURI__.dialog.ask("Clear all upload history?", {
+            title: "B2Upload",
+            kind: "warning",
+        });
+        if (!confirmed) return;
+    }
     await invoke("clear_history");
     await renderHistory();
 });
