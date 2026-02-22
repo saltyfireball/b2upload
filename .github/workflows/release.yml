@@ -68,6 +68,8 @@ jobs:
 
       - name: Install Tauri CLI
         run: cargo binstall tauri-cli --force -y
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
         run: cargo tauri build ${{ matrix.args }} -- --locked
