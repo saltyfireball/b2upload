@@ -672,6 +672,7 @@ const termScrollFade = document.getElementById("scrollFade");
 
 let aboutRunning = false;
 let aboutCancelled = false;
+let appVersion = "1.0.0";
 
 const NORMAL_W = 500, NORMAL_H = 600;
 const ABOUT_W = 650, ABOUT_H = 650;
@@ -680,8 +681,8 @@ aboutBtn.addEventListener("click", async () => {
     aboutCancelled = false;
     aboutModal.classList.remove("hidden");
     try {
-        const version = await window.__TAURI__.app.getVersion();
-        aboutVersion.textContent = `v${version}`;
+        appVersion = await window.__TAURI__.app.getVersion();
+        aboutVersion.textContent = `v${appVersion}`;
     } catch (_) {}
     await invoke("resize_window", { width: ABOUT_W, height: ABOUT_H });
     if (!aboutRunning) runTerminal();
@@ -829,11 +830,11 @@ async function runTerminal() {
     await termSleep(60);
     await to('  <span class="t-out-info">    ▄▀         ▀▄    </span>  <span class="t-output">─────────────────</span>');
     await termSleep(60);
-    await to('  <span class="t-out-info">   █   ●     ●   █   </span>  <span class="t-out-purple">App:</span> <span class="t-output">B2Upload v1.0.0</span>');
+    await to(`  <span class="t-out-info">   █   ●     ●   █   </span>  <span class="t-out-purple">App:</span> <span class="t-output">B2Upload v${appVersion}</span>`);
     await termSleep(60);
     await to('  <span class="t-out-info">   █       ▄     █   </span>  <span class="t-out-purple">Backend:</span> <span class="t-output">Rust + Tauri 2</span>');
     await termSleep(60);
-    await to('  <span class="t-out-info">   █    ▀▀▀▀    █    </span>  <span class="t-out-purple">Storage:</span> <span class="t-output">IOTA Stronghold</span>');
+    await to('  <span class="t-out-info">   █    ▀▀▀▀    █    </span>  <span class="t-out-purple">Storage:</span> <span class="t-output">OS Keychain + Zeroize</span>');
     await termSleep(60);
     await to('  <span class="t-out-info">    ▀▄         ▄▀    </span>  <span class="t-out-purple">Upload:</span> <span class="t-output">AWS S3 (Backblaze B2)</span>');
     await termSleep(60);
@@ -844,18 +845,18 @@ async function runTerminal() {
     await to("");
     await termSleep(600);
 
-    // Command 1: init stronghold vault
+    // Command 1: init keychain storage
     const c1 = termCreateLine(termPrompt());
     await termType(c1, [
         { text: "b2upload", cls: "t-cmd-bin" },
         { text: " init", cls: "t-command" },
-        { text: " --vault", cls: "t-cmd-flag" },
-        { text: " stronghold", cls: "t-cmd-str" },
+        { text: " --keychain", cls: "t-cmd-flag" },
+        { text: " secure", cls: "t-cmd-str" },
     ]);
     await termSleep(300);
-    await termSpinner("Initializing encrypted vault...", 900);
-    await to('<span class="t-out-ok">✓</span> <span class="t-output">Stronghold vault created at ~/Library/Application Support/</span>');
-    await to('<span class="t-output">  Encryption: </span><span class="t-out-info">AES-256-GCM</span><span class="t-output"> | Key derivation: </span><span class="t-out-info">Argon2</span>');
+    await termSpinner("Initializing secure storage...", 900);
+    await to('<span class="t-out-ok">✓</span> <span class="t-output">OS Keychain configured at ~/Library/Application Support/</span>');
+    await to('<span class="t-output">  Secrets: </span><span class="t-out-info">OS Keychain</span><span class="t-output"> | Memory: </span><span class="t-out-info">ZeroizeOnDrop</span>');
     await to("", "t-output", 200);
 
     // Command 2: configure credentials
