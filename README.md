@@ -25,7 +25,7 @@ Drop files onto the window or paste a URL to download and upload. Get shareable 
 - **Cancel uploads** - cancel in-progress batch uploads; in-flight files finish, remaining are skipped
 - **Individual history deletion** - remove single entries from upload history
 - **Settings validation** - required fields are validated before saving with visual feedback
-- **Encrypted credential storage** - sensitive keys stored individually in the system keyring (macOS Keychain, Windows Credential Manager, Linux Secret Service) with automatic memory zeroization; non-sensitive config stored in a local JSON file
+- **Encrypted credential storage** - sensitive keys stored in the system keyring (macOS Keychain, Windows Credential Manager, Linux Secret Service) with automatic memory zeroization; non-sensitive config stored in a local JSON file
 - **Configurable upload paths** - date folders, UUID filenames, overwrite protection, and per-folder URL tokens are all optional
 - **URL encoding** - filenames with spaces and special characters are properly percent-encoded
 
@@ -36,8 +36,11 @@ Drop files onto the window or paste a URL to download and upload. Get shareable 
   <img src="assets/example_settings_2.png" width="600" />
 </p>
 
-Open settings with the gear icon. There are three sections:
+Open settings with the gear icon. There are four sections: Connection, Folders, Token Mode, and Upload Options.
 
+### Connection
+
+| Field                  | Description                                                    |
 | ---------------------- | -------------------------------------------------------------- |
 | **Domain**             | Your public-facing domain (e.g. `media.example.com`)           |
 | **Bucket Name**        | The B2 bucket name                                             |
@@ -45,7 +48,7 @@ Open settings with the gear icon. There are three sections:
 | **Application Key ID** | B2 app key ID                                                  |
 | **Application Key**    | B2 app key secret                                              |
 
-All five connection fields are required before uploads will work.
+All five connection fields are required before uploads will work. A **Test Connection** button validates your S3 credentials without uploading anything.
 
 ### Folders
 
@@ -72,11 +75,12 @@ When dynamic mode is enabled, static token fields are hidden (values are preserv
 
 ### Upload Options
 
-| Option                | Default | Description                                                                                                                                                                                                       |
-| --------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Date folders**      | On      | Inserts a `YYYY/MM/DD` path segment after the folder name                                                                                                                                                         |
-| **UUID filenames**    | On      | Replaces the original filename with a random UUID. Prevents filename collisions.                                                                                                                                  |
-| **Overwrite uploads** | Off     | When off and UUID filenames are also off, the app checks if the file already exists before uploading and returns an error if it does. When UUID filenames are on, this check is skipped (no collisions possible). |
+| Option                     | Default | Description                                                                                                                                                                                                       |
+| -------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Date folders**           | On      | Inserts a `YYYY/MM/DD` path segment after the folder name                                                                                                                                                        |
+| **UUID filenames**         | On      | Replaces the original filename with a random UUID. Prevents filename collisions.                                                                                                                                  |
+| **Overwrite uploads**      | Off     | When off and UUID filenames are also off, the app checks if the file already exists before uploading and returns an error if it does. When UUID filenames are on, this check is skipped (no collisions possible).  |
+| **Desktop notifications**  | On      | Shows an OS notification when an upload batch completes.                                                                                                                                                          |
 
 ### Upload Path Examples
 
@@ -269,7 +273,7 @@ wrangler deploy
 - **Backend:** Rust + Tauri 2
 - **Frontend:** Vanilla JS + CSS (no build step)
 - **Storage:** AWS S3 SDK (Backblaze B2 S3-compatible API)
-- **Credentials:** Split storage -- non-sensitive config in `config.json`, sensitive keys individually in system keyring via `keyring` crate with `zeroize` for automatic memory clearing
+- **Credentials:** Split storage -- non-sensitive config in `config.json`, sensitive keys in system keyring via `keyring` crate with `zeroize` for automatic memory clearing
 - **Async:** Tokio
 
 ## Installation
