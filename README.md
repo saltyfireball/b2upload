@@ -8,11 +8,12 @@
 
 A lightweight desktop app for uploading files to Backblaze B2 via the S3-compatible API. Runs on macOS, Windows, and Linux. Built with Rust, Tauri 2, and vanilla JS.
 
-Drop files onto the window, get shareable URLs back instantly.
+Drop files onto the window or paste a URL to download and upload. Get shareable URLs back instantly.
 
 ## Features
 
 - **Drag-and-drop uploads** - drop one or many files onto the window
+- **URL uploads** - paste a URL to download and upload the file in one step
 - **Concurrent uploads** - up to 5 files upload simultaneously with per-file status
 - **Two folder modes** - toggle between two independently configured folders (e.g. "private" and "shared")
 - **Auto-copy** - single-file uploads are automatically copied to the clipboard
