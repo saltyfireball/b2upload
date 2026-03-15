@@ -68,6 +68,56 @@ async fn upload_file(
 }
 
 #[tauri::command]
+async fn download_and_upload_url(
+    app: tauri::AppHandle,
+    history_mutex: tauri::State<'_, storage::HistoryMutex>,
+    url: String,
+    mode: String,
+    auto_clip: bool,
+    ttl: Option<u64>,
+) -> Result<String, String> {
+    // Download the URL to a temp file
+    let tmp_path = uploader::download_url(&url).await?;
+
+    // Upload the temp file
+    let config = storage::get_config(&app);
+    let creds = storage::B2Credentials::load()?;
+    let result_url = uploader::upload_file(&tmp_path, &mode, &config, &creds, ttl).await;
+
+    // Clean up temp file regardless of upload result
+    let _ = std::fs::remove_file(&tmp_path);
+
+    let result_url = result_url?;
+
+    if auto_clip {
+        app.clipboard()
+            .write_text(&result_url)
+            .map_err(|e| e.to_string())?;
+    }
+
+    let now = chrono::Local::now();
+    let datetime = now.format("%Y-%m-%d %H:%M:%S").to_string();
+
+    // Use the URL's filename for the history entry
+    let url_path = url.split('?').next().unwrap_or(&url);
+    let file_name = url_path.split('/').last().unwrap_or("download").to_string();
+
+    let entry = json!({
+        "file": file_name,
+        "url": result_url,
+        "datetime": datetime,
+        "mode": mode,
+    });
+
+    {
+        let _lock = history_mutex.0.lock().unwrap();
+        storage::add_history(&app, entry);
+    }
+
+    Ok(result_url)
+}
+
+#[tauri::command]
 async fn copy_to_clipboard(app: tauri::AppHandle, text: String) -> Result<(), String> {
     app.clipboard()
         .write_text(&text)
@@ -143,6 +193,7 @@ fn main() {
             has_settings,
             get_saved_secret_keys,
             upload_file,
+            download_and_upload_url,
             test_connection,
             copy_to_clipboard,
             get_history,

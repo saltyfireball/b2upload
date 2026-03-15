@@ -13,6 +13,8 @@ use std::path::Path;
 use uuid::Uuid;
 use zeroize::Zeroizing;
 
+use tokio::io::AsyncWriteExt;
+
 use crate::storage::B2Credentials;
 
 type HmacSha256 = Hmac<Sha256>;
@@ -212,6 +214,51 @@ pub async fn upload_file(
 
     // client drops here -- AWS SDK zeroizes its internal credential buffers
     Ok(url)
+}
+
+/// Download a URL to a temporary file, preserving the original extension.
+/// Returns the path to the temp file.
+pub async fn download_url(url: &str) -> Result<String, String> {
+    let response = reqwest::get(url)
+        .await
+        .map_err(|e| format!("Download failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Download failed: HTTP {}", response.status()));
+    }
+
+    // Extract filename from URL path (strip query params)
+    let parsed = url.split('?').next().unwrap_or(url);
+    let url_filename = parsed.split('/').last().unwrap_or("download");
+
+    // Get extension, default to "bin"
+    let ext = Path::new(url_filename)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("bin");
+
+    // Create temp file with the right extension
+    let tmp_dir = std::env::temp_dir();
+    let tmp_path = tmp_dir.join(format!("b2upload_{}.{}", Uuid::new_v4(), ext));
+
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read response body: {}", e))?;
+
+    let mut file = tokio::fs::File::create(&tmp_path)
+        .await
+        .map_err(|e| format!("Failed to create temp file: {}", e))?;
+
+    file.write_all(&bytes)
+        .await
+        .map_err(|e| format!("Failed to write temp file: {}", e))?;
+
+    file.flush()
+        .await
+        .map_err(|e| format!("Failed to flush temp file: {}", e))?;
+
+    Ok(tmp_path.to_string_lossy().to_string())
 }
 
 pub async fn test_connection(

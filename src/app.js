@@ -84,6 +84,88 @@ defaultTtlSelect.addEventListener("change", () => {
     defaultTtlCustom.classList.toggle("hidden", defaultTtlSelect.value !== "custom");
 });
 
+// URL bar elements
+const urlInput = document.getElementById("url-input");
+const urlSubmitBtn = document.getElementById("url-submit-btn");
+
+urlInput.addEventListener("input", () => {
+    const hasValue = urlInput.value.trim().length > 0;
+    urlSubmitBtn.classList.toggle("hidden", !hasValue);
+});
+
+urlSubmitBtn.addEventListener("click", () => handleUrlUpload());
+urlInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && urlInput.value.trim()) handleUrlUpload();
+});
+
+async function handleUrlUpload() {
+    const url = urlInput.value.trim();
+    if (!url || isUploading) return;
+
+    if (!/^https?:\/\/.+/.test(url)) {
+        showStatus("Invalid URL", "error");
+        return;
+    }
+
+    isUploading = true;
+    urlInput.disabled = true;
+    urlSubmitBtn.disabled = true;
+    urlSubmitBtn.textContent = "Downloading...";
+
+    const hasSettings = await invoke("has_settings");
+    if (!hasSettings) {
+        showStatus("Please configure settings first", "error");
+        isUploading = false;
+        urlInput.disabled = false;
+        urlSubmitBtn.disabled = false;
+        urlSubmitBtn.textContent = "Upload";
+        return;
+    }
+
+    dropZone.classList.add("uploading");
+    dropZone.querySelector("p").textContent = "Downloading and uploading...";
+    hideResults();
+    resultsBox.classList.remove("hidden");
+    showStatus("", "");
+
+    // Extract filename from URL for the result row
+    const urlPath = url.split("?")[0];
+    const fileName = urlPath.split("/").pop() || url;
+    const card = addResultRow(fileName);
+
+    try {
+        const resultUrl = await invoke("download_and_upload_url", {
+            url,
+            mode,
+            autoClip: false,
+            ttl: getCurrentTtl(),
+        });
+        setRowSuccess(card, resultUrl);
+        lastResults.push({ file: fileName, url: resultUrl });
+
+        if (autoClip) {
+            await invoke("copy_to_clipboard", { text: resultUrl });
+        }
+
+        showStatus(
+            "Uploaded" + (autoClip ? " - copied to clipboard" : ""),
+            "success"
+        );
+        urlInput.value = "";
+        urlSubmitBtn.classList.add("hidden");
+    } catch (err) {
+        setRowError(card, err.toString());
+        showStatus("Upload failed", "error");
+    }
+
+    dropZone.classList.remove("uploading");
+    dropZone.querySelector("p").textContent = "Drop or click to upload";
+    urlInput.disabled = false;
+    urlSubmitBtn.disabled = false;
+    urlSubmitBtn.textContent = "Upload";
+    isUploading = false;
+}
+
 function getCurrentTtl() {
     if (tokenMode !== "dynamic") return null;
     if (ttlSelect.value === "custom") {

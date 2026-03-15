@@ -169,6 +169,55 @@ body {
     gap: 12px;
 }
 
+/* URL Bar */
+#url-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 16px;
+    padding: 0;
+}
+
+#url-input {
+    flex: 1;
+    background: #221f22;
+    border: 1px solid #403e41;
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: #fcfcfa;
+    font-size: 13px;
+    font-family: "SF Mono", Menlo, monospace;
+    outline: none;
+    transition: border-color 0.2s;
+}
+#url-input:focus {
+    border-color: #78dce8;
+}
+#url-input::placeholder {
+    color: #5b595c;
+}
+
+#url-submit-btn {
+    background: #78dce8;
+    color: #19181a;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+    flex-shrink: 0;
+}
+#url-submit-btn:hover {
+    background: #a9dc76;
+}
+#url-submit-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
 #drop-zone {
     margin: 12px 16px;
     min-height: 60px;
