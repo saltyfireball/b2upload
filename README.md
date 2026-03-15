@@ -10,6 +10,10 @@ A lightweight desktop app for uploading files to Backblaze B2 via the S3-compati
 
 Drop files onto the window or paste a URL to download and upload. Get shareable URLs back instantly.
 
+<p align="center">
+  <img src="assets/example_main_window.png" width="600" />
+</p>
+
 ## Features
 
 - **Drag-and-drop uploads** - drop one or many files onto the window
@@ -27,11 +31,13 @@ Drop files onto the window or paste a URL to download and upload. Get shareable 
 
 ## Settings
 
+<p align="center">
+  <img src="assets/example_settings_1.png" width="600" />
+  <img src="assets/example_settings_2.png" width="600" />
+</p>
+
 Open settings with the gear icon. There are three sections:
 
-### Connection
-
-| Field                  | Description                                                    |
 | ---------------------- | -------------------------------------------------------------- |
 | **Domain**             | Your public-facing domain (e.g. `media.example.com`)           |
 | **Bucket Name**        | The B2 bucket name                                             |
