@@ -1,5 +1,27 @@
 const { invoke } = window.__TAURI__.core;
 const { getCurrentWebview } = window.__TAURI__.webview;
+const { listen } = window.__TAURI__.event;
+
+// Map of uploadId -> result row DOM element, kept alive for the duration of
+// each upload so we can route progress events to the right row.
+const uploadRows = new Map();
+
+function newUploadId() {
+    if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+    return "u-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+}
+
+listen("upload-progress", (event) => {
+    const p = event.payload || {};
+    const row = uploadRows.get(p.uploadId);
+    if (!row) return;
+    const fill = row.querySelector(".r-progress-fill");
+    if (!fill) return;
+    const total = Number(p.bytesTotal) || 0;
+    const done = Number(p.bytesDone) || 0;
+    const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+    fill.style.width = pct + "%";
+});
 
 const mainView = document.getElementById("main-view");
 const settingsView = document.getElementById("settings-view");
@@ -132,9 +154,12 @@ async function handleUrlUpload() {
     const urlPath = url.split("?")[0];
     const fileName = urlPath.split("/").pop() || url;
     const card = addResultRow(fileName);
+    const uploadId = newUploadId();
+    uploadRows.set(uploadId, card);
 
     try {
         const resultUrl = await invoke("download_and_upload_url", {
+            uploadId,
             url,
             mode,
             autoClip: false,
@@ -157,6 +182,7 @@ async function handleUrlUpload() {
         setRowError(card, err.toString());
         showStatus("Upload failed", "error");
     }
+    uploadRows.delete(uploadId);
 
     dropZone.classList.remove("uploading");
     dropZone.querySelector("p").textContent = "Drop or click to upload";
@@ -212,6 +238,7 @@ function addResultRow(fileName) {
       <span class="r-status pending">uploading</span>
     </div>
     <div class="r-url"></div>
+    <div class="r-progress"><div class="r-progress-fill"></div></div>
     <button class="r-copy-btn" disabled>Copy</button>
   `;
     resultsBody.appendChild(card);
@@ -219,6 +246,7 @@ function addResultRow(fileName) {
 }
 
 function setRowSuccess(card, url) {
+    card.classList.add("done");
     card.querySelector(".r-url").textContent = url;
     card.querySelector(".r-status").textContent = "done";
     card.querySelector(".r-status").className = "r-status success";
@@ -234,12 +262,14 @@ function setRowSuccess(card, url) {
 }
 
 function setRowError(card, msg) {
+    card.classList.add("done");
     card.querySelector(".r-url").textContent = msg;
     card.querySelector(".r-status").textContent = "failed";
     card.querySelector(".r-status").className = "r-status error";
 }
 
 function setRowCancelled(card) {
+    card.classList.add("done");
     card.querySelector(".r-status").textContent = "cancelled";
     card.querySelector(".r-status").className = "r-status cancelled";
 }
@@ -442,6 +472,11 @@ settingsBtn.addEventListener("click", async () => {
     setSettingsToggle(toggleUuidFilenames, (settings.UUID_FILENAMES || "on") !== "off");
     setSettingsToggle(toggleOverwriteUploads, (settings.OVERWRITE_UPLOADS || "no") === "yes");
     setSettingsToggle(toggleNotifications, (settings.NOTIFICATIONS || "on") !== "off");
+    // Multipart parallelism (default 4)
+    const parallelismInput = settingsForm.elements["MULTIPART_PARALLELISM"];
+    if (parallelismInput) {
+        parallelismInput.value = settings.MULTIPART_PARALLELISM || "4";
+    }
     // Token mode
     const isDynamic = (settings.TOKEN_MODE || "static") === "dynamic";
     setSettingsToggle(toggleTokenMode, isDynamic);
@@ -486,6 +521,11 @@ settingsForm.addEventListener("submit", async (e) => {
     values.OVERWRITE_UPLOADS = toggleOverwriteUploads.classList.contains("on") ? "yes" : "no";
     values.NOTIFICATIONS = toggleNotifications.classList.contains("on") ? "on" : "off";
     values.TOKEN_MODE = toggleTokenMode.classList.contains("on") ? "dynamic" : "static";
+    // Clamp multipart parallelism to [1, 16]; default 4
+    const pRaw = parseInt(values.MULTIPART_PARALLELISM, 10);
+    values.MULTIPART_PARALLELISM = String(
+        Number.isFinite(pRaw) ? Math.min(16, Math.max(1, pRaw)) : 4
+    );
     // If default TTL is "custom", use the custom input value
     if (defaultTtlSelect.value === "custom") {
         const customVal = defaultTtlCustom.value;
@@ -616,10 +656,14 @@ async function handleFilePaths(paths) {
 
     const rows = paths.map((p) => {
         const name = p.split(/[\\/]/).pop() || p;
+        const tr = addResultRow(name);
+        const uploadId = newUploadId();
+        uploadRows.set(uploadId, tr);
         return {
             name,
             path: p,
-            tr: addResultRow(name),
+            tr,
+            uploadId,
         };
     });
 
@@ -638,6 +682,7 @@ async function handleFilePaths(paths) {
                     // Mark remaining rows as cancelled
                     for (let i = next; i < rows.length; i++) {
                         setRowCancelled(rows[i].tr);
+                        uploadRows.delete(rows[i].uploadId);
                         cancelled++;
                     }
                     next = rows.length;
@@ -649,6 +694,7 @@ async function handleFilePaths(paths) {
                 (async () => {
                     try {
                         const url = await invoke("upload_file", {
+                            uploadId: row.uploadId,
                             filePath: row.path,
                             mode,
                             autoClip: false,
@@ -661,6 +707,7 @@ async function handleFilePaths(paths) {
                         setRowError(row.tr, err.toString());
                         failed++;
                     }
+                    uploadRows.delete(row.uploadId);
                     active--;
                     if (next < rows.length) launch();
                     else if (active === 0) resolveAll();

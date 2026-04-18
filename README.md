@@ -18,6 +18,7 @@ Drop files onto the window or paste a URL to download and upload. Get shareable 
 
 - **Drag-and-drop uploads** - drop one or many files onto the window
 - **URL uploads** - paste a URL to download and upload the file in one step
+- **Progress bars** - per-file progress with real byte-level updates for large files via S3 multipart upload
 - **Concurrent uploads** - up to 5 files upload simultaneously with per-file status
 - **Two folder modes** - toggle between two independently configured folders (e.g. "private" and "shared")
 - **Auto-copy** - single-file uploads are automatically copied to the clipboard
@@ -81,6 +82,7 @@ When dynamic mode is enabled, static token fields are hidden (values are preserv
 | **UUID filenames**         | On      | Replaces the original filename with a random UUID. Prevents filename collisions.                                                                                                                                  |
 | **Overwrite uploads**      | Off     | When off and UUID filenames are also off, the app checks if the file already exists before uploading and returns an error if it does. When UUID filenames are on, this check is skipped (no collisions possible).  |
 | **Desktop notifications**  | On      | Shows an OS notification when an upload batch completes.                                                                                                                                                          |
+| **Multipart parallel parts** | 4     | Number of parts uploaded in parallel for files over 16 MiB. Higher values speed up large uploads but use more memory and bandwidth. Range 1-16.                                                                   |
 
 ### Upload Path Examples
 

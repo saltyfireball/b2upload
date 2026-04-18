@@ -5,9 +5,37 @@ mod uploader;
 
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use tauri::Manager;
+use std::sync::Arc;
+use tauri::Emitter;
 use tauri::LogicalSize;
+use tauri::Manager;
 use tauri_plugin_clipboard_manager::ClipboardExt;
+
+const DEFAULT_PARALLELISM: usize = 4;
+
+fn build_progress_callback(
+    app: tauri::AppHandle,
+    upload_id: String,
+) -> uploader::ProgressFn {
+    Arc::new(move |done, total| {
+        let _ = app.emit(
+            "upload-progress",
+            json!({
+                "uploadId": upload_id,
+                "bytesDone": done,
+                "bytesTotal": total,
+            }),
+        );
+    })
+}
+
+fn parallelism_from_config(config: &HashMap<String, String>) -> usize {
+    config
+        .get("MULTIPART_PARALLELISM")
+        .and_then(|s| s.parse::<usize>().ok())
+        .filter(|n| *n > 0 && *n <= 32)
+        .unwrap_or(DEFAULT_PARALLELISM)
+}
 
 #[tauri::command]
 async fn get_settings(app: tauri::AppHandle) -> Result<HashMap<String, String>, String> {
@@ -29,6 +57,7 @@ async fn has_settings(app: tauri::AppHandle) -> Result<bool, String> {
 async fn upload_file(
     app: tauri::AppHandle,
     history_mutex: tauri::State<'_, storage::HistoryMutex>,
+    upload_id: String,
     file_path: String,
     mode: String,
     auto_clip: bool,
@@ -36,7 +65,18 @@ async fn upload_file(
 ) -> Result<String, String> {
     let config = storage::get_config(&app);
     let creds = storage::B2Credentials::load()?;
-    let url = uploader::upload_file(&file_path, &mode, &config, &creds, ttl).await?;
+    let parallelism = parallelism_from_config(&config);
+    let progress = build_progress_callback(app.clone(), upload_id);
+    let url = uploader::upload_file(
+        &file_path,
+        &mode,
+        &config,
+        &creds,
+        ttl,
+        parallelism,
+        Some(progress),
+    )
+    .await?;
 
     if auto_clip {
         app.clipboard()
@@ -71,6 +111,7 @@ async fn upload_file(
 async fn download_and_upload_url(
     app: tauri::AppHandle,
     history_mutex: tauri::State<'_, storage::HistoryMutex>,
+    upload_id: String,
     url: String,
     mode: String,
     auto_clip: bool,
@@ -82,7 +123,18 @@ async fn download_and_upload_url(
     // Upload the temp file
     let config = storage::get_config(&app);
     let creds = storage::B2Credentials::load()?;
-    let result_url = uploader::upload_file(&tmp_path, &mode, &config, &creds, ttl).await;
+    let parallelism = parallelism_from_config(&config);
+    let progress = build_progress_callback(app.clone(), upload_id);
+    let result_url = uploader::upload_file(
+        &tmp_path,
+        &mode,
+        &config,
+        &creds,
+        ttl,
+        parallelism,
+        Some(progress),
+    )
+    .await;
 
     // Clean up temp file regardless of upload result
     let _ = std::fs::remove_file(&tmp_path);

@@ -28,6 +28,7 @@ zeroize = { version = "1", features = ["derive"] }
 percent-encoding = "2"
 reqwest = { version = "0.12", features = ["stream"] }
 tempfile = "3"
+aws-smithy-runtime-api = "1"
 
 [profile.release]
 opt-level = 2 

@@ -22,6 +22,7 @@ const CONFIG_KEYS: &[&str] = &[
     "TOKEN_MODE",
     "DEFAULT_TTL",
     "NOTIFICATIONS",
+    "MULTIPART_PARALLELISM",
 ];
 
 // --- B2Credentials: sensitive data with automatic zeroization ---
