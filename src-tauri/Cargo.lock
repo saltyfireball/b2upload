@@ -690,7 +690,7 @@ dependencies = [
 
 [[package]]
 name = "b2upload"
-version = "1.3.0"
+version = "1.4.0"
 dependencies = [
  "aws-config",
  "aws-credential-types",
