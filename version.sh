@@ -74,7 +74,7 @@ inplace_edit "s/\"version\":[[:space:]]*\"$current\"/\"version\": \"$new\"/" "$T
 # Force the lockfile to sync the new version
 # We use the package name from Cargo.toml to perform a targeted update
 PKG_NAME=$(grep -m 1 '^name' "$CARGO_TOML" | cut -d '"' -f 2)
-cargo update --manifest-path "$CARGO_TOML" -p "$PKG_NAME" --offline 2>/dev/null
+cargo update --manifest-path "$CARGO_TOML" -p "$PKG_NAME"
 
 echo -e "${CLR_SUCCESS}[OK] Files and Lockfile updated to $new${CLR_RESET}"
 
