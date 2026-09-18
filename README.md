@@ -290,7 +290,9 @@ Pre-built binaries are available from the [Releases](../../releases) page for al
 
 ### macOS Gatekeeper
 
-The app is not currently signed with an Apple Developer certificate. You may need to remove the quarantine attribute after installing:
+Releases from v1.4.1 on are signed with an Apple Developer ID certificate and notarized by Apple, so the `.dmg` opens without a Gatekeeper warning.
+
+Releases up to v1.4.0, and any build you make yourself without a certificate, are unsigned. For those you may need to remove the quarantine attribute after installing:
 
 ```sh
 xattr -cr /Applications/B2Upload.app
@@ -324,6 +326,25 @@ cargo tauri build    # build for current platform
 ```
 
 CI/CD builds for all three platforms with targets: `dmg`, `deb`, `appimage`, `msi`, `nsis`.
+
+### macOS signing and notarization
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`. On the macOS runner, `cargo tauri build` imports the certificate into a temporary keychain, signs the app, and submits it to Apple for notarization. Nothing about signing lives in `tauri.conf.json`, so a plain local `cargo tauri build` still produces an unsigned app.
+
+The workflow reads these repository secrets (only the macOS job receives them):
+
+| Secret                       | Value                                                                  |
+| ---------------------------- | ---------------------------------------------------------------------- |
+| `APPLE_CERTIFICATE`          | Base64 of the Developer ID Application certificate exported as `.p12` |
+| `APPLE_CERTIFICATE_PASSWORD` | Password the `.p12` was exported with                                  |
+| `APPLE_SIGNING_IDENTITY`     | `Developer ID Application: NAME (TEAMID)`                              |
+| `APPLE_ID`                   | Apple ID email used for notarization                                   |
+| `APPLE_PASSWORD`             | App-specific password for that Apple ID                                |
+| `APPLE_TEAM_ID`              | Apple Developer team ID                                                |
+
+Set each one with `gh secret set NAME`. Forks without these secrets need to remove the `env` block from the Build step to get an unsigned macOS build.
+
+To sign a local build, export the same variables (without the two `APPLE_CERTIFICATE*` ones if the certificate is already in your keychain) before running `cargo tauri build`.
 
 ## Project Structure
 
